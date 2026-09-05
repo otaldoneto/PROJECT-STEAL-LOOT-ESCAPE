@@ -48,6 +48,59 @@
             512
           ]
         }
+      },
+      "Loot": {
+        "$className": "Folder",
+        "Bandage": {
+          "$className": "Part",
+          "$attributes": {
+            "ItemId": "Bandage",
+            "Amount": 1
+          },
+          "$properties": {
+            "Anchored": true,
+            "Color": [
+              0.85,
+              0.85,
+              0.85
+            ],
+            "Position": [
+              0,
+              2,
+              0
+            ],
+            "Size": [
+              2,
+              2,
+              2
+            ]
+          }
+        },
+        "GoldBar": {
+          "$className": "Part",
+          "$attributes": {
+            "ItemId": "GoldBar",
+            "Amount": 1
+          },
+          "$properties": {
+            "Anchored": true,
+            "Color": [
+              1,
+              0.75,
+              0.1
+            ],
+            "Position": [
+              8,
+              2,
+              0
+            ],
+            "Size": [
+              2,
+              2,
+              2
+            ]
+          }
+        }
       }
     },
     "Lighting": {

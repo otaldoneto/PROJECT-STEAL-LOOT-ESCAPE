@@ -14,4 +14,14 @@ Next, open `Steal-Loot-Escape.rbxlx` in Roblox Studio and start the Rojo server:
 rojo serve
 ```
 
+## Inventário
+
+O jogador pode abrir a mochila com `B`. Os itens de teste ficam na pasta `Workspace/Loot` e são coletados por `ProximityPrompt`.
+
+As regras ficam em `src/shared/InventoryConfig.luau`. Para adicionar loot ao mapa, crie uma `BasePart` dentro de `Workspace/Loot` com os atributos `ItemId` e `Amount`. O item precisa existir no catálogo e a quantidade não pode ultrapassar `MaxStack`.
+
+O servidor é a autoridade: peso, slots, stacks, distância da coleta e remoção são validados no servidor. O inventário é salvo no DataStore `StealLootEscapeInventory_v1`.
+
+Para testar persistência no Studio, publique a experiência e habilite **Game Settings > Security > Enable Studio Access to API Services**. Sem acesso ao DataStore, o jogo inicia sem dados persistidos e desativa o salvamento para evitar sobrescrever o inventário do jogador.
+
 For more help, check out [the Rojo documentation](https://rojo.space/docs).
