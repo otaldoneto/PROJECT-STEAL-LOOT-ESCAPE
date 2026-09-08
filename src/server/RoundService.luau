@@ -14,6 +14,7 @@ local lobbySpawn
 local mapSpawn
 local roundNumber = 0
 local running = false
+local playerConnections = {}
 
 local INTERMISSION_DURATION = GameConfig.Round.IntermissionDuration
 local ROUND_DURATION = GameConfig.Round.ActiveDuration
@@ -57,24 +58,38 @@ end
 
 local function teleportAll(spawnPart, inLobby)
 	for _, player in Players:GetPlayers() do
-		teleportPlayer(player, spawnPart)
-		player:SetAttribute("InLobby", inLobby)
+		local eligible = player:GetAttribute("PersistentDataReady") == true
+		if inLobby or eligible then
+			teleportPlayer(player, spawnPart)
+			player:SetAttribute("InLobby", inLobby)
+		else
+			teleportPlayer(player, lobbySpawn)
+			player:SetAttribute("InLobby", true)
+		end
 	end
 end
 
 local function setupPlayer(player)
 	player:SetAttribute("InLobby", true)
-	player.CharacterAdded:Connect(function()
+	local function syncPlayerParticipation()
+		local ready = player:GetAttribute("PersistentDataReady") == true
+		if Workspace:GetAttribute("RoundPhase") == "Active" and ready then
+			teleportPlayer(player, mapSpawn)
+			player:SetAttribute("InLobby", false)
+		else
+			teleportPlayer(player, lobbySpawn)
+			player:SetAttribute("InLobby", true)
+		end
+	end
+	playerConnections[player] = {
+		player:GetAttributeChangedSignal("PersistentDataReady"):Connect(syncPlayerParticipation),
+		player.CharacterAdded:Connect(function()
 		task.defer(function()
-			if Workspace:GetAttribute("RoundPhase") == "Active" then
-				teleportPlayer(player, mapSpawn)
-				player:SetAttribute("InLobby", false)
-			else
-				teleportPlayer(player, lobbySpawn)
-				player:SetAttribute("InLobby", true)
-			end
+				syncPlayerParticipation()
 		end)
-	end)
+		end),
+	}
+	syncPlayerParticipation()
 end
 
 local function countdown(duration, expectedPhase)
@@ -141,6 +156,15 @@ function RoundService.Start(inventoryService, lootService, escapeService, threat
 	lobbySpawn = lobbyPart
 	mapSpawn = mapPart
 	Players.PlayerAdded:Connect(setupPlayer)
+	Players.PlayerRemoving:Connect(function(player)
+		local connections = playerConnections[player]
+		if connections then
+			for _, connection in ipairs(connections) do
+				connection:Disconnect()
+			end
+			playerConnections[player] = nil
+		end
+	end)
 	for _, player in Players:GetPlayers() do
 		setupPlayer(player)
 	end

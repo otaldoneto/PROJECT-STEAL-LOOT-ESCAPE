@@ -111,7 +111,7 @@ local lobby = Workspace:FindFirstChild("Lobby") or Instance.new("Folder")
 lobby.Name = "Lobby"
 lobby.Parent = Workspace
 
-local lobbySpawn = lobby:FindFirstChild("SpawnLocation") or Workspace:FindFirstChild("LobbySpawn") or Instance.new("Part")
+local lobbySpawn = lobby:FindFirstChild("SpawnLocation") or Instance.new("Part")
 lobbySpawn.Name = "SpawnLocation"
 lobbySpawn.Anchored = true
 lobbySpawn.CanCollide = false
@@ -127,7 +127,7 @@ local map = Workspace:FindFirstChild("Map") or Instance.new("Folder")
 map.Name = "Map"
 map.Parent = Workspace
 
-local mapSpawn = map:FindFirstChild("SpawnLocation") or Workspace:FindFirstChild("MapSpawn") or Instance.new("Part")
+local mapSpawn = map:FindFirstChild("SpawnLocation") or Instance.new("Part")
 mapSpawn.Name = "SpawnLocation"
 mapSpawn.Anchored = true
 mapSpawn.CanCollide = false

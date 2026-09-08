@@ -12,6 +12,8 @@ local legacyProgressionStore = DataStoreService:GetDataStore("StealLootEscapePro
 local legacyInventoryStore = DataStoreService:GetDataStore("StealLootEscapeInventory_v1")
 local sessions = {}
 local saveLocks = {}
+local aliasConnections = {}
+local publishing = {}
 local running = false
 
 local DEFAULT_DATA = { Money = 0, Points = 0, SprintLevel = 0, BackpackLevel = 0, Inventory = {} }
@@ -89,6 +91,7 @@ local function migrate(player)
 end
 
 local function publish(player, data)
+	publishing[player] = true
 	local leaderstats = player:FindFirstChild("leaderstats")
 	if not leaderstats then
 		leaderstats = Instance.new("Folder")
@@ -110,12 +113,29 @@ local function publish(player, data)
 		value.Value = amount
 		player:SetAttribute(name, amount)
 	end
+	if not aliasConnections[player] then
+		aliasConnections[player] = {}
+		for name in pairs(values) do
+			local value = leaderstats:FindFirstChild(name)
+			if value and value:IsA("IntValue") then
+				aliasConnections[player][name] = value.Changed:Connect(function()
+					if not publishing[player] and sessions[player] then
+						publish(player, sessions[player])
+					end
+				end)
+			end
+		end
+	end
+	publishing[player] = nil
 	player:SetAttribute("DataStoreReady", true)
 	player:SetAttribute("PersistentDataReady", true)
 end
 
 local function loadPlayer(player)
 	local success, data = tryGet(playerStore, getKey(player))
+	if player.Parent ~= Players then
+		return
+	end
 	if not success then
 		player:SetAttribute("DataStoreReady", false)
 		player:SetAttribute("PersistentDataReady", false)
@@ -134,6 +154,9 @@ local function loadPlayer(player)
 		end
 	else
 		loadedData = sanitize(data)
+	end
+	if player.Parent ~= Players then
+		return
 	end
 	sessions[player] = loadedData
 	publish(player, loadedData)
@@ -200,6 +223,13 @@ function DataStoreManager.Start()
 	end)
 	Players.PlayerRemoving:Connect(function(player)
 		savePlayer(player)
+		if aliasConnections[player] then
+			for _, connection in pairs(aliasConnections[player]) do
+				connection:Disconnect()
+			end
+		end
+		aliasConnections[player] = nil
+		publishing[player] = nil
 		sessions[player] = nil
 		saveLocks[player] = nil
 	end)

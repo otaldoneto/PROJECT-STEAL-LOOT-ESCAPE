@@ -168,7 +168,7 @@ local function scanCameras()
 			for _, player in Players:GetPlayers() do
 				local root = getCharacterRoot(player)
 				local riskMultiplier = RiskConfig.GetVisionMultiplier(riskLevels[player] or 0)
-				if root and not player:GetAttribute("Escaped") and not player:GetAttribute("Hidden") and not player:GetAttribute("InLobby") and canSee(camera.Position, camera.CFrame.LookVector, root.Position, range * riskMultiplier, angle, camera, root) then
+				if root and player:GetAttribute("PersistentDataReady") == true and not player:GetAttribute("Escaped") and not player:GetAttribute("Hidden") and not player:GetAttribute("InLobby") and canSee(camera.Position, camera.CFrame.LookVector, root.Position, range * riskMultiplier, angle, camera, root) then
 					setDetection(player, camera)
 				end
 			end
@@ -220,7 +220,7 @@ local function updateGuard(guard, state, deltaTime)
 	local targetDistance = math.huge
 	for _, player in Players:GetPlayers() do
 		local playerRoot = getCharacterRoot(player)
-		if playerRoot and not player:GetAttribute("Escaped") and not player:GetAttribute("Hidden") and not player:GetAttribute("InLobby") then
+		if playerRoot and player:GetAttribute("PersistentDataReady") == true and not player:GetAttribute("Escaped") and not player:GetAttribute("Hidden") and not player:GetAttribute("InLobby") then
 			local riskMultiplier = RiskConfig.GetVisionMultiplier(riskLevels[player] or 0)
 			local distance = (playerRoot.Position - root.Position).Magnitude
 			if distance < targetDistance and canSee(root.Position, root.CFrame.LookVector, playerRoot.Position, state.VisionRange * riskMultiplier, state.VisionAngle, guard, playerRoot) then
@@ -340,7 +340,7 @@ function ThreatService.Start(guards, cameras, inventoryService, spawnPart)
 	end
 
 	Workspace:SetAttribute("RoundTimeLeft", 0)
-	Workspace:SetAttribute("RoundActive", true)
+	Workspace:SetAttribute("RoundActive", false)
 	Players.PlayerAdded:Connect(initializePlayer)
 	for _, player in Players:GetPlayers() do
 		initializePlayer(player)

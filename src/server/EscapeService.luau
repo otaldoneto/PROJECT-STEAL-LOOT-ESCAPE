@@ -83,7 +83,7 @@ local function setupPrompt()
 	prompt.Parent = escapeZone
 
 	prompt.Triggered:Connect(function(player)
-		if deliveryInProgress[player] or player.Parent ~= Players or not canUseZone(player, escapeZone) then
+		if deliveryInProgress[player] or player.Parent ~= Players or player:GetAttribute("PersistentDataReady") ~= true or not canUseZone(player, escapeZone) then
 			player:SetAttribute("EscapeStatus", "Move closer to the escape zone")
 			return
 		end

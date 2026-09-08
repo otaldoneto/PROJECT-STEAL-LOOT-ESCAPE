@@ -96,7 +96,7 @@ local function releasePlayer(player, restoreCharacter)
 end
 
 local function enterHideout(player, state)
-	if state.Occupant or playerHideouts[player] or Workspace:GetAttribute("RoundPhase") ~= "Active" or player:GetAttribute("Escaped") or player:GetAttribute("Hidden") or not isNear(player, state.Part) then
+	if state.Occupant or playerHideouts[player] or Workspace:GetAttribute("RoundPhase") ~= "Active" or player:GetAttribute("PersistentDataReady") ~= true or player:GetAttribute("Escaped") or player:GetAttribute("Hidden") or not isNear(player, state.Part) then
 		return
 	end
 	if not setCharacterHidden(player, true, state.Part) then

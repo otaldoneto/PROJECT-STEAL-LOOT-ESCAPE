@@ -36,7 +36,7 @@ O documento canônico persistente agora é mantido por `src/server/PlayerDataSto
 }
 ```
 
-`CurrencyService` e `ProgressionService` usam esse estado em memória e não salvam mais em DataStores próprios. O `InventoryService` mantém somente `RoundInventory` em memória; ele é perdido ao reiniciar a rodada, escapar ou ser capturado e não altera o `PlayerData` persistente. Na primeira leitura sem documento v2, o manager migra os stores antigos sem apagá-los; se qualquer leitura legada falhar, o salvamento fica bloqueado para evitar substituir progresso por defaults.
+`CurrencyService` e `ProgressionService` usam esse estado em memória e não salvam mais em DataStores próprios. O `InventoryService` mantém somente `RoundInventory` em memória; ele é perdido ao reiniciar a rodada, escapar ou ser capturado e não altera o `PlayerData` persistente. Na primeira leitura sem documento v2, o manager migra os stores antigos sem apagá-los; se qualquer leitura legada falhar, o salvamento fica bloqueado para evitar substituir progresso por defaults. Os aliases `Moedas`/`MochilaNivel` e os valores publicados em `leaderstats` são somente representação do PlayerData; alterações diretas são restauradas pela publicação canônica.
 
 ## Inventário
 
@@ -80,6 +80,8 @@ Ao ser capturado pela primeira vez, o jogador é restaurado em um ponto seguro e
 
 ## Ameaças
 
+O `GuardController` possui cleanup protegido para tasks e encerra quando o modelo, root ou Humanoid são removidos. O `ThreatService` mantém detecção/dano, enquanto o `GuardController` é o único responsável pelo movimento de guardas `PathfindingControlled`.
+
 ## Lockpick
 
 Os cofres ficam em `Workspace.Vaults` e recebem um `ProximityPrompt` criado pelo servidor. Ao iniciar, o servidor abre a UI de lockpick via `LockpickRemote`; o cliente anima o indicador, mas o servidor calcula o tempo válido usando o relógio sincronizado. Pressionar Espaço dentro da zona verde adiciona uma `GoldBar` ao inventário e desativa o cofre na rodada. Errar toca `AlarmSound`, define a posição do alarme e faz o guarda investigar o cofre por 15 segundos. O `AlarmSoundId` pode ser configurado como atributo do cofre.
@@ -94,6 +96,23 @@ Guardas podem ser configuradas como `Model` com `PrimaryPart` ou `HumanoidRootPa
 
 Os esconderijos ficam em `Workspace/Hideouts` e são `BasePart` com `ProximityPrompt` criado pelo servidor. O jogador pode entrar em um armário ou lixeira durante a fase `Active`; cada esconderijo aceita somente um ocupante. Enquanto escondido, o personagem fica invisível e imobilizado, e guardas/câmeras não o detectam. A saída só ocorre pelo próprio prompt, com validação server-side. Morte, saída do jogador, troca de rodada e fim da rodada liberam o esconderijo e restauram o personagem.
 
+O lifecycle de esconderijos é idempotente: `PlayerRemoving`, `CharacterRemoving`, `CharacterAdded`, destruição do objeto e troca de rodada liberam o ocupante, restauram o prompt e limpam os atributos sem manter referências antigas.
+
+## Spawns oficiais
+
+Os únicos spawns oficiais são:
+
+```text
+Workspace.Lobby.SpawnLocation
+Workspace.Map.SpawnLocation
+```
+
+Os aliases antigos `Workspace.LobbySpawn` e `Workspace.MapSpawn` foram removidos do projeto Rojo.
+
+## Lockpick
+
+Cada sessão de Lockpick possui timestamp de expiração no servidor. Uma varredura única encerra sessões após 12 segundos mesmo que o cliente não envie tentativa; `PlayerRemoving`, erro, acerto, falha e troca de fase também limpam a sessão.
+
 ## Verificação e Segurança
 
 O projeto não contém chaves ou credenciais: DataStoreService usa somente nomes públicos de stores, e nenhum segredo é armazenado no código. Para validar localmente, execute `rojo build -o "Steal-Loot-Escape.rbxlx"` e confira o diagnóstico do Studio. Testes de DataStore exigem uma experiência publicada e **Enable Studio Access to API Services** habilitado; sem acesso, o salvamento é desativado para evitar sobrescrever dados.
@@ -103,7 +122,7 @@ O projeto não contém chaves ou credenciais: DataStoreService usa somente nomes
 1. Execute `aftman install` e depois `rojo serve`; conecte o plugin Rojo no Roblox Studio.
 2. Publique uma experiência de teste e habilite **Game Settings > Security > Enable Studio Access to API Services**.
 3. Aguarde `Active`, colete todo o loot e vá ao `EscapeZone`.
-4. Escolha `Stay` para guardar o carryover em 2x ou `Return to Lobby` para receber a recompensa e ir ao `LobbySpawn`.
+4. Escolha `Stay` para guardar o carryover em 2x ou `Return to Lobby` para receber a recompensa e ir ao `Workspace.Lobby.SpawnLocation`.
 5. Para testar captura, seja pego uma vez e confirme que o loot permanece; seja pego novamente e confirme o alerta e a perda dos itens.
 6. Saia e entre novamente para confirmar a persistência de `Money`, `Points` e `SprintLevel`.
 

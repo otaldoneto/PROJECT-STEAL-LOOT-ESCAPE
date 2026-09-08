@@ -1,4 +1,5 @@
 local Players = game:GetService("Players")
+local Workspace = game:GetService("Workspace")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local InventoryConfig = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("InventoryConfig"))
 
@@ -50,7 +51,7 @@ end
 function InventoryService.AddItem(player, itemId, amount)
 	if typeof(player) ~= "Instance" or not player:IsA("Player") then return false, "Invalid player" end
 	if typeof(itemId) ~= "string" or not isPositiveInteger(amount) then return false, "Invalid item request" end
-	if not inventories[player] or not roundActive then return false, "Round inventory is not ready" end
+	if not inventories[player] or not roundActive or player:GetAttribute("PersistentDataReady") ~= true then return false, "Round inventory is not ready" end
 	local item = InventoryConfig.Items[itemId]
 	if not item then return false, "Unknown item" end
 	local inventory = getInventory(player)
@@ -68,6 +69,7 @@ end
 
 function InventoryService.RemoveItem(player, itemId, amount)
 	if typeof(player) ~= "Instance" or not player:IsA("Player") or typeof(itemId) ~= "string" or not isPositiveInteger(amount) then return false, "Invalid item request" end
+	if player:GetAttribute("PersistentDataReady") ~= true or not roundActive or Workspace:GetAttribute("RoundPhase") ~= "Active" then return false, "Round inventory is not editable" end
 	local item = InventoryConfig.Items[itemId]
 	local inventory = inventories[player]
 	local currentAmount = inventory and inventory.Items[itemId]
