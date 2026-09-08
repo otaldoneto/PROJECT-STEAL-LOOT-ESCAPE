@@ -20,6 +20,7 @@ local TARGET_WIDTH = 0.2
 local CYCLE_DURATION = 1.8
 local ALARM_DURATION = 15
 local MAX_DISTANCE = 12
+local TIMEOUT_CHECK_INTERVAL = 0.25
 
 local function isNear(player, vault)
 	local character = player.Character
@@ -44,8 +45,24 @@ end
 
 local function closeSession(player, message)
 	sessions[player] = nil
-	remote:FireClient(player, "Close", message or "")
+	if player.Parent == Players then
+		remote:FireClient(player, "Close", message or "")
+	end
 end
+
+task.spawn(function()
+	while true do
+		task.wait(TIMEOUT_CHECK_INTERVAL)
+		local now = workspace:GetServerTimeNow()
+		for player, session in pairs(sessions) do
+			if player.Parent ~= Players then
+				sessions[player] = nil
+			elseif now >= session.ExpiresAt then
+				closeSession(player, "Lockpick timed out")
+			end
+		end
+	end
+end)
 
 local function alarm(vault)
 	local sound = vault:FindFirstChild("AlarmSound")
@@ -71,9 +88,11 @@ local function startSession(player, vault)
 		return
 	end
 
+	local startedAt = workspace:GetServerTimeNow()
 	sessions[player] = {
 		Vault = vault,
-		StartedAt = workspace:GetServerTimeNow(),
+		StartedAt = startedAt,
+		ExpiresAt = startedAt + SESSION_DURATION,
 		TargetStart = 0.35,
 	}
 	remote:FireClient(player, "Start", {

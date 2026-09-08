@@ -59,10 +59,11 @@ local function finishDelivery(player, rewardType, reward, decision)
 		player:SetAttribute("EscapeReward", totalReward)
 		pendingSales[player] = {
 			Amount = totalReward,
-	Players.PlayerAdded:Connect(initializePlayer)
 			RewardType = rewardType,
 		}
-		initializePlayer(player)
+		player:SetAttribute("EscapeStatus", "Robbery complete. Return to the lobby counter to sell.")
+		moveToLobby(player)
+	end
 	player:SetAttribute("Escaped", true)
 	return true
 end
@@ -100,7 +101,7 @@ local function setupPrompt()
 			deliveryInProgress[player] = nil
 			return
 		end
-		local _, _, allLootCollected = LootService.GetRoundStatus()
+		local _, _, allLootCollected = LootService.GetRoundStatus(player)
 		if allLootCollected and reward > 0 then
 			pendingChoices[player] = {
 				Reward = reward,
@@ -158,6 +159,7 @@ end
 function EscapeService.ResetRound()
 	deliveryInProgress = {}
 	pendingChoices = {}
+	pendingSales = {}
 	if escapeZone then
 		local prompt = escapeZone:FindFirstChildOfClass("ProximityPrompt")
 		if prompt then

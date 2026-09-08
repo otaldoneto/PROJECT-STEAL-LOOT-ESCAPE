@@ -77,19 +77,22 @@ end
 
 local function releasePlayer(player, restoreCharacter)
 	local hideout = playerHideouts[player]
-	if not hideout then
-		return
-	end
-
 	playerHideouts[player] = nil
-	hideout.Occupant = nil
-	hideout.Prompt.ActionText = "Hide"
-	hideout.Prompt.ObjectText = hideout.DisplayName
-	if restoreCharacter and player.Parent == Players then
+	if hideout then
+		if hideout.Occupant == player then
+			hideout.Occupant = nil
+		end
+		if hideout.Prompt and hideout.Prompt.Parent then
+			hideout.Prompt.ActionText = "Hide"
+			hideout.Prompt.ObjectText = hideout.DisplayName
+		end
+	end
+	if restoreCharacter and player.Parent == Players and hideout and hideout.Part then
 		setCharacterHidden(player, false, hideout.Part)
 	end
 	player:SetAttribute("Hidden", false)
 	player:SetAttribute("Hideout", "")
+	player:SetAttribute("HideoutWasSprinting", false)
 end
 
 local function enterHideout(player, state)
@@ -150,17 +153,33 @@ function HideoutService.Start(folder)
 		setupHideout(descendant)
 	end
 	folder.DescendantAdded:Connect(setupHideout)
+	folder.DescendantRemoving:Connect(function(descendant)
+		local state = hideouts[descendant]
+		if not state then
+			return
+		end
+		if state.Occupant then
+			releasePlayer(state.Occupant, true)
+		end
+		hideouts[descendant] = nil
+	end)
 
 	Players.PlayerRemoving:Connect(function(player)
 		releasePlayer(player, false)
 	end)
 
 	Players.PlayerAdded:Connect(function(player)
+		player.CharacterAdded:Connect(function()
+			releasePlayer(player, false)
+		end)
 		player.CharacterRemoving:Connect(function()
 			releasePlayer(player, false)
 		end)
 	end)
 	for _, player in Players:GetPlayers() do
+		player.CharacterAdded:Connect(function()
+			releasePlayer(player, false)
+		end)
 		player.CharacterRemoving:Connect(function()
 			releasePlayer(player, false)
 		end)

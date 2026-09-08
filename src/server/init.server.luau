@@ -10,6 +10,7 @@ local RoundService = require(script:WaitForChild("RoundService"))
 local HideoutService = require(script:WaitForChild("HideoutService"))
 local ProgressionService = require(script:WaitForChild("ProgressionService"))
 local LobbyService = require(script:WaitForChild("LobbyService"))
+local DataStoreManager = require(script:WaitForChild("PlayerDataStore"))
 local requestTimestamps = {}
 
 local function isRateLimited(player)
@@ -159,8 +160,9 @@ vaults.Name = "Vaults"
 vaults.Parent = Workspace
 
 InventoryService.Start(inventoryUpdated, inventorySnapshot)
-CurrencyService.Start()
-ProgressionService.Start(progressionUpdated, CurrencyService)
+DataStoreManager.Start()
+CurrencyService.Start(DataStoreManager)
+ProgressionService.Start(progressionUpdated, DataStoreManager)
 LootService.Start(InventoryService, CurrencyService, ThreatService, lootFolder)
 EscapeService.Start(InventoryService, CurrencyService, LootService, escapeZone, lobbySpawn)
 ThreatService.Start(guards, securityCameras, InventoryService, lobbySpawn)

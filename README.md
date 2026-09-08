@@ -20,11 +20,23 @@ O arquivo `default.project.json` monta `src/shared` em `ReplicatedStorage/Shared
 
 Os módulos em `src/shared` contêm apenas configurações e regras puras reutilizáveis: `InventoryConfig`, `ProgressionConfig`, `GameConfig` e `RiskConfig`. Eles podem ser lidos pelo cliente para renderização, mas nenhuma decisão de prêmio, compra, velocidade, risco, DataStore ou rodada depende do cliente. A lógica de autoridade permanece modularizada em `src/server`.
 
-O HUD simples de partida fica em `StarterGui.HUDController`, sincronizado por `src/client/ScreenGui/MatchStatus.client.lua`. Ele atualiza `MatchTime` usando `ReplicatedStorage.MatchTime` e `BackpackStatus` usando `leaderstats.Mochila`, no formato `Mochila: atual/máximo`. O servidor publica `Mochila` como o número de slots ocupados e `InventorySlotsMax` como o limite.
+O HUD geral é controlado por `src/client/init.client.luau`. Ele apresenta fase, timer, risco, detecção, peso, capacidade, itens, dinheiro, captura, escape, venda e Sprint usando atributos/RemoteEvents fornecidos pelo servidor. `src/client/ScreenGui/Lockpick.client.lua` permanece separado por ser UI específica da interação de cofres.
 
-O `src/client/ScreenGui/HUDController.client.lua` também atualiza `TimerLabel` com o tempo formatado em `MM:SS` e `LootLabel` no formato `Loot: X/5`, observando `MatchTime.Value` e `leaderstats.Mochila` com `GetPropertyChangedSignal("Value")`.
+O `src/server/DataStoreManager.server.lua` inicializa o módulo central `src/server/PlayerDataStore.luau`, que carrega e salva o documento canônico `StealLootEscapePlayerData_v2` com `DataStoreService`. O carregamento ocorre em `PlayerAdded`; o salvamento ocorre a cada 5 minutos, em `PlayerRemoving` e em `BindToClose`, com `pcall`, três tentativas e bloqueio contra salvamentos concorrentes. Em falha de carregamento, `DataStoreReady` fica falso e os dados não são sobrescritos.
 
-O `src/server/DataStoreManager.server.lua` carrega e salva `leaderstats.Moedas` e `leaderstats.MochilaNivel` com `DataStoreService`. O carregamento ocorre em `PlayerAdded`; o salvamento ocorre a cada 5 minutos, em `PlayerRemoving` e em `BindToClose`, com `pcall`, três tentativas e bloqueio contra salvamentos concorrentes. Em falha de carregamento, `DataStoreReady` fica falso e os dados não são sobrescritos.
+O documento canônico persistente agora é mantido por `src/server/PlayerDataStore.luau` no DataStore `StealLootEscapePlayerData_v2`:
+
+```lua
+{
+	Money = 0,
+	Points = 0,
+	SprintLevel = 0,
+	BackpackLevel = 0,
+	Inventory = {},
+}
+```
+
+`CurrencyService` e `ProgressionService` usam esse estado em memória e não salvam mais em DataStores próprios. O `InventoryService` mantém somente `RoundInventory` em memória; ele é perdido ao reiniciar a rodada, escapar ou ser capturado e não altera o `PlayerData` persistente. Na primeira leitura sem documento v2, o manager migra os stores antigos sem apagá-los; se qualquer leitura legada falhar, o salvamento fica bloqueado para evitar substituir progresso por defaults.
 
 ## Inventário
 
@@ -32,9 +44,9 @@ O jogador pode abrir a mochila com `B`. Os objetos de teste ficam na pasta `Work
 
 As regras ficam em `src/shared/InventoryConfig.luau`. Para adicionar loot de inventário ao mapa, crie uma `BasePart` dentro de `Workspace/Loot` com os atributos `ItemId` e `Amount`. O item precisa existir no catálogo e a quantidade não pode ultrapassar `MaxStack`.
 
-Para loot de recompensa, use os atributos `RewardType` (`Money` ou `Points`) e `Reward` (inteiro positivo). Cada objeto só pode ser coletado uma vez por rodada, e o servidor restaura os objetos no início da rodada seguinte. O servidor valida distância, personagem vivo, tipo e valor antes de conceder a recompensa. `Money` e `Points` são publicados como atributos do jogador e em `leaderstats`, além de serem salvos no DataStore `StealLootEscapeCurrency_v1`.
+Para loot de recompensa, use os atributos `RewardType` (`Money` ou `Points`) e `Reward` (inteiro positivo). Cada objeto pode ser coletado uma vez por jogador em cada rodada, e o servidor restaura os objetos no início da rodada seguinte. O servidor valida distância, personagem vivo, tipo e valor antes de conceder a recompensa. `Money` e `Points` são publicados como atributos do jogador e em `leaderstats`, além de serem salvos no documento canônico `StealLootEscapePlayerData_v2`.
 
-O servidor é a autoridade: peso, slots, stacks, distância da coleta, recompensas e remoção são validados no servidor. O inventário é salvo no DataStore `StealLootEscapeInventory_v1`.
+O servidor é a autoridade: peso, slots, stacks, distância da coleta, recompensas e remoção são validados no servidor. O inventário da rodada é temporário e não é salvo como inventário persistente.
 
 ## Zona de Escape
 
@@ -50,7 +62,7 @@ O ciclo é `Intermission` de 20 segundos no lobby, `Active` de 120 segundos no m
 
 ## Progressão e Loja
 
-A loja abre com `M`. O botão de Sprint envia somente uma intenção de compra; o servidor valida o nível atual, o custo definido em `src/shared/ProgressionConfig.luau` e o saldo `Money` antes de gastar. Os níveis de Sprint são permanentes e ficam salvos no DataStore `StealLootEscapeProgression_v1`. O progresso só é aceito após carregamento bem-sucedido, evitando compras em uma sessão sem persistência.
+A loja abre com `M`. O botão de Sprint envia somente uma intenção de compra; o servidor valida o nível atual, o custo definido em `src/shared/ProgressionConfig.luau` e o saldo `Money` antes de gastar. Os níveis de Sprint são permanentes e ficam salvos no documento canônico `StealLootEscapePlayerData_v2`. O progresso só é aceito após carregamento bem-sucedido, evitando compras em uma sessão sem persistência.
 
 Durante a fase `Active`, segure `LeftShift` para correr. A velocidade é aplicada pelo servidor conforme o nível persistido, e o cliente não pode escolher o valor. O Sprint é interrompido ao esconder-se, escapar, morrer ou perder o foco da janela.
 
@@ -60,7 +72,7 @@ Cada loot possui `RiskLevel` de `0` a `2` e `RiskDuration` em segundos. `0` é b
 
 O timer é controlado pelo `RoundService`: a fase `Active` dura 120 segundos e `TimerWarning` fica ativo nos últimos 30 segundos. O HUD exibe a fase, o tempo, o alerta e o risco atual; esses dados são somente leitura no cliente.
 
-O ciclo de partida é controlado apenas pelo servidor: `Intermission` de 20 segundos, `Active` de 120 segundos e `Results` de 8 segundos. No início de uma rodada ativa, o loot do mapa é restaurado e o inventário carregado da rodada anterior é descartado; o jogador precisa coletar novamente e escapar. O cliente apenas exibe `RoundPhase`, `RoundTimeLeft` e os estados replicados, sem poder iniciar, acelerar ou encerrar a rodada.
+O ciclo de partida é controlado apenas pelo servidor: `Intermission` de 20 segundos, `Active` de 120 segundos e `Results` de 8 segundos. No início de uma rodada ativa, o loot do mapa é restaurado e cada jogador recebe um `RoundInventory` vazio; o jogador precisa coletar novamente e escapar. O `RoundInventory` não é salvo no PlayerData persistente. O cliente apenas exibe `RoundPhase`, `RoundTimeLeft` e os estados replicados, sem poder iniciar, acelerar ou encerrar a rodada.
 
 Quando todo o loot válido da rodada foi coletado e o jogador chega ao escape, o servidor oferece duas opções. `Stay` mantém o jogador no jogo e transforma o loot entregue em carryover com valor dobrado para a próxima entrega. `Return to Lobby` paga a recompensa acumulada e teleporta o jogador para `Workspace.Lobby.SpawnLocation`; jogadores no lobby não coletam loot nem são detectados. A decisão é validada por RemoteEvent no servidor.
 

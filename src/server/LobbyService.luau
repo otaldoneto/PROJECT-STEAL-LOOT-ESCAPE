@@ -9,6 +9,11 @@ local leaderboardBoard
 local sellPrompt
 local leaderboardStore = DataStoreService:GetOrderedDataStore("StealLootEscapeLeaderboard_v1")
 local actionLocks = {}
+local LEADERBOARD_REFRESH_INTERVAL = 60
+local LEADERBOARD_RETRIES = 3
+local lastLeaderboardAttempt = 0
+local leaderboardRefreshInProgress = false
+local cachedLeaderboardText
 
 local function canUsePart(player, part)
 	local character = player.Character
@@ -41,13 +46,27 @@ local function getBoardLabel()
 	return label
 end
 
-local function refreshLeaderboard()
+local function refreshLeaderboard(force)
+	local now = os.clock()
+	if leaderboardRefreshInProgress or (not force and now - lastLeaderboardAttempt < LEADERBOARD_REFRESH_INTERVAL) then
+		return
+	end
+	lastLeaderboardAttempt = now
+	leaderboardRefreshInProgress = true
 	local label = getBoardLabel()
-	local success, pages = pcall(function()
-		return leaderboardStore:GetSortedAsync(false, 10)
-	end)
+	local success, pages
+	for attempt = 1, LEADERBOARD_RETRIES do
+		success, pages = pcall(function()
+			return leaderboardStore:GetSortedAsync(false, 10)
+		end)
+		if success then
+			break
+		end
+		task.wait(attempt)
+	end
 	if not success then
-		label.Text = "TOP THIEVES\nLeaderboard temporarily unavailable"
+		label.Text = cachedLeaderboardText or "TOP THIEVES\nLeaderboard temporarily unavailable"
+		leaderboardRefreshInProgress = false
 		return
 	end
 
@@ -62,7 +81,9 @@ local function refreshLeaderboard()
 		end
 		table.insert(entries, string.format("%d. %s  %d", rank, name, entry.value))
 	end
-	label.Text = table.concat(entries, "\n")
+	cachedLeaderboardText = table.concat(entries, "\n")
+	label.Text = cachedLeaderboardText
+	leaderboardRefreshInProgress = false
 end
 
 local function recordSale(player, amount)
@@ -104,7 +125,7 @@ local function setupSellPrompt()
 		if not recordSale(player, amount) then
 			warn(string.format("Could not update leaderboard for %s", player.Name))
 		end
-		refreshLeaderboard()
+		refreshLeaderboard(false)
 		actionLocks[player] = nil
 	end)
 end
@@ -116,7 +137,7 @@ function LobbyService.Start(escapeService, currencyService, counter, board)
 	sellCounter = counter
 	leaderboardBoard = board
 	setupSellPrompt()
-	refreshLeaderboard()
+	refreshLeaderboard(true)
 
 	Players.PlayerRemoving:Connect(function(player)
 		actionLocks[player] = nil
@@ -125,7 +146,7 @@ function LobbyService.Start(escapeService, currencyService, counter, board)
 	task.spawn(function()
 		while true do
 			task.wait(60)
-			refreshLeaderboard()
+			refreshLeaderboard(false)
 		end
 	end)
 end

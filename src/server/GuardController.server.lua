@@ -159,13 +159,14 @@ local function startController(guard)
 	end
 
 	task.spawn(function()
+		local ok, errorMessage = xpcall(function()
 		local waypoints = getWaypoints()
 		local waypointIndex = 1
 		local lastSeenAt = 0
 		local lastTargetPosition
 		local targetPlayer
 		local alerting = false
-		while guard.Parent == guardFolder and humanoid.Health > 0 do
+		while guard.Parent == guardFolder and root.Parent == guard and humanoid.Parent == guard and humanoid.Health > 0 do
 			if Workspace:GetAttribute("RoundPhase") ~= "Active" then
 				humanoid.WalkSpeed = PATROL_SPEED
 				humanoid:MoveTo(root.Position)
@@ -216,7 +217,11 @@ local function startController(guard)
 			end
 			task.wait(UPDATE_INTERVAL)
 		end
+		end, debug.traceback)
 		controllers[guard] = nil
+		if not ok then
+			warn(string.format("Guard controller stopped for %s: %s", guard.Name, errorMessage))
+		end
 	end)
 end
 

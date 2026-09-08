@@ -235,7 +235,7 @@ local function updateGuard(guard, state, deltaTime)
 		setDetection(targetPlayer, guard)
 		if targetRoot then
 			local direction = targetRoot.Position - root.Position
-			if direction.Magnitude > state.AttackDistance then
+			if direction.Magnitude > state.AttackDistance and not guard:GetAttribute("PathfindingControlled") then
 				local step = math.min(state.Speed * deltaTime, direction.Magnitude - state.AttackDistance)
 				local nextPosition = root.Position + direction.Unit * step
 				guard:PivotTo(CFrame.lookAt(nextPosition, targetRoot.Position))
@@ -327,7 +327,9 @@ function ThreatService.Start(guards, cameras, inventoryService, spawnPart)
 		for guard, state in pairs(guardStates) do
 			local root = getGuardRoot(guard)
 			if root then
-				guard:PivotTo(CFrame.lookAt(state.Origin, state.Origin + Vector3.new(0, 0, -1)))
+				if not guard:GetAttribute("PathfindingControlled") then
+					guard:PivotTo(CFrame.lookAt(state.Origin, state.Origin + Vector3.new(0, 0, -1)))
+				end
 				state.LastAttack = 0
 				state.PatrolTime = 0
 			end

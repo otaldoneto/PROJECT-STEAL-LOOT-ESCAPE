@@ -13,6 +13,8 @@ local lootContainer
 local activeLoot = {}
 local lootStates = {}
 local originalProperties = {}
+local roundLoot = {}
+local collecting = {}
 
 local function canCollect(player, lootPart)
 	local character = player.Character
@@ -22,6 +24,18 @@ local function canCollect(player, lootPart)
 		return false
 	end
 	return (root.Position - lootPart.Position).Magnitude <= 12
+end
+
+local function getRoundLoot(player)
+	local state = roundLoot[player]
+	if state then return state end
+	state = {
+		collectedItems = {},
+		totalValue = 0,
+		weight = 0,
+	}
+	roundLoot[player] = state
+	return state
 end
 
 local function setupLootPart(lootPart)
@@ -69,10 +83,11 @@ local function setupLootPart(lootPart)
 
 	prompt.Triggered:Connect(function(player)
 		local lootState = activeLoot[lootPart]
-		if not lootState or lootState.Collected or lootState.Collecting or Workspace:GetAttribute("RoundPhase") ~= "Active" or player.Parent ~= Players or player:GetAttribute("InLobby") or not lootPart:IsDescendantOf(lootContainer) or not canCollect(player, lootPart) then
+		local playerLoot = getRoundLoot(player)
+		if not lootState or playerLoot.collectedItems[lootPart] or collecting[player] or Workspace:GetAttribute("RoundPhase") ~= "Active" or player.Parent ~= Players or player:GetAttribute("InLobby") or not lootPart:IsDescendantOf(lootContainer) or not canCollect(player, lootPart) then
 			return
 		end
-		lootState.Collecting = true
+		collecting[player] = true
 
 		local added
 		if isItemLoot then
@@ -82,16 +97,15 @@ local function setupLootPart(lootPart)
 		end
 		if added then
 			ThreatService.MarkRisk(player, riskLevel, riskDuration)
+			playerLoot.collectedItems[lootPart] = true
+			playerLoot.totalValue = playerLoot.totalValue + (isItemLoot and item.EscapeValue * amount or reward)
+			playerLoot.weight = playerLoot.weight + (isItemLoot and item.Weight * amount or 0)
 			player:SetAttribute("Escaped", false)
 			player:SetAttribute("EscapeReward", 0)
 			player:SetAttribute("EscapeStatus", "Loot collected. Reach the escape zone")
-			lootState.Collected = true
-			activeLoot[lootPart] = nil
-			prompt.Enabled = false
-			lootPart.Transparency = 1
-			lootPart.CanCollide = false
+			collecting[player] = nil
 		else
-			lootState.Collecting = false
+			collecting[player] = nil
 		end
 	end)
 end
@@ -105,13 +119,18 @@ function LootService.Start(inventoryService, currencyService, threatService, loo
 		setupLootPart(descendant)
 	end
 	lootFolder.DescendantAdded:Connect(setupLootPart)
+	Players.PlayerRemoving:Connect(function(player)
+		roundLoot[player] = nil
+		collecting[player] = nil
+	end)
 end
 
 function LootService.ResetRound()
+	roundLoot = {}
+	collecting = {}
 	for lootPart, state in pairs(lootStates) do
 		if lootPart:IsDescendantOf(lootContainer) then
 			state.Collecting = false
-			state.Collected = false
 			activeLoot[lootPart] = state
 			state.Prompt.Enabled = true
 			local properties = originalProperties[lootPart]
@@ -121,18 +140,19 @@ function LootService.ResetRound()
 	end
 end
 
-function LootService.GetRoundStatus()
+function LootService.GetRoundStatus(player)
 	local total = 0
-	local collected = 0
-	for lootPart, state in pairs(lootStates) do
+	for lootPart in pairs(lootStates) do
 		if lootPart:IsDescendantOf(lootContainer) then
 			total += 1
-			if state.Collected then
-				collected += 1
-			end
 		end
 	end
-	return total, collected, total > 0 and collected >= total
+	local playerLoot = getRoundLoot(player)
+	local collected = 0
+	for _ in pairs(playerLoot.collectedItems) do
+		collected += 1
+	end
+	return total, collected, total > 0 and collected >= total, playerLoot
 end
 
 return LootService

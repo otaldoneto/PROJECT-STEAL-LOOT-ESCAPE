@@ -179,6 +179,13 @@ buySprint.TextSize = 18
 buySprint.Text = "Upgrade Sprint"
 buySprint.Parent = shopPanel
 
+local function updateInventoryTitle()
+	local weight = player:GetAttribute("InventoryWeight") or 0
+	local slots = player:GetAttribute("InventorySlots") or 0
+	local money = player:GetAttribute("Money") or 0
+	title.Text = string.format("Backpack  $%d  %.1f / %.1f kg  (%d / %d)", money, weight, inventoryConfig.MaxWeight, slots, inventoryConfig.MaxSlots)
+end
+
 local function render(snapshot)
 	local lines = {}
 	for _, entry in snapshot do
@@ -186,9 +193,7 @@ local function render(snapshot)
 	end
 	contents.Text = #lines > 0 and table.concat(lines, "\n") or "Empty"
 
-	local weight = player:GetAttribute("InventoryWeight") or 0
-	local slots = player:GetAttribute("InventorySlots") or 0
-	title.Text = string.format("Backpack  %.1f / %.1f kg  (%d / %d)", weight, inventoryConfig.MaxWeight, slots, inventoryConfig.MaxSlots)
+	updateInventoryTitle()
 end
 
 inventoryUpdated.OnClientEvent:Connect(render)
@@ -317,7 +322,7 @@ UserInputService.WindowFocusReleased:Connect(function()
 end)
 
 player:GetAttributeChangedSignal("InventoryWeight"):Connect(function()
-	local weight = player:GetAttribute("InventoryWeight") or 0
-	local slots = player:GetAttribute("InventorySlots") or 0
-	title.Text = string.format("Backpack  %.1f / %.1f kg  (%d / %d)", weight, inventoryConfig.MaxWeight, slots, inventoryConfig.MaxSlots)
+	updateInventoryTitle()
 end)
+player:GetAttributeChangedSignal("InventorySlots"):Connect(updateInventoryTitle)
+player:GetAttributeChangedSignal("Money"):Connect(updateInventoryTitle)
