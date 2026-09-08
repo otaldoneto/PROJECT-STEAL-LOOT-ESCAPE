@@ -133,6 +133,20 @@ local function publish(player)
 
 	player:SetAttribute("InventoryWeight", inventory.Weight)
 	player:SetAttribute("InventorySlots", inventory.SlotCount)
+	player:SetAttribute("InventorySlotsMax", InventoryConfig.MaxSlots)
+	local leaderstats = player:FindFirstChild("leaderstats")
+	if not leaderstats then
+		leaderstats = Instance.new("Folder")
+		leaderstats.Name = "leaderstats"
+		leaderstats.Parent = player
+	end
+	local mochila = leaderstats:FindFirstChild("Mochila")
+	if not mochila then
+		mochila = Instance.new("IntValue")
+		mochila.Name = "Mochila"
+		mochila.Parent = leaderstats
+	end
+	mochila.Value = inventory.SlotCount
 	if inventoryUpdated then
 		inventoryUpdated:FireClient(player, snapshot)
 	end

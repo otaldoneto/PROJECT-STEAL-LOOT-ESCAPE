@@ -1,7 +1,7 @@
 return {
 	Round = {
-		IntermissionDuration = 10,
-		ActiveDuration = 180,
+		IntermissionDuration = 20,
+		ActiveDuration = 120,
 		ResultsDuration = 8,
 		TimerWarningSeconds = 30,
 	},

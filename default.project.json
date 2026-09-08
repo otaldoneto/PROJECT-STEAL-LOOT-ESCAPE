@@ -23,6 +23,16 @@
       }
     },
 
+    "StarterGui": {
+      "ScreenGui": {
+        "$className": "ScreenGui",
+        "$properties": {
+          "ResetOnSpawn": false
+        },
+        "$path": "src/client/ScreenGui"
+      }
+    },
+
     "Workspace": {
       "$properties": {
         "FilteringEnabled": true
@@ -217,6 +227,81 @@
       },
       "Guards": {
         "$className": "Folder"
+      },
+      "GuardWaypoints": {
+        "$className": "Folder",
+        "Waypoint01": {
+          "$className": "Part",
+          "$properties": {
+            "Anchored": true,
+            "CanCollide": false,
+            "Position": [
+              22,
+              2,
+              18
+            ],
+            "Size": [
+              1,
+              1,
+              1
+            ],
+            "Transparency": 1
+          }
+        },
+        "Waypoint02": {
+          "$className": "Part",
+          "$properties": {
+            "Anchored": true,
+            "CanCollide": false,
+            "Position": [
+              38,
+              2,
+              18
+            ],
+            "Size": [
+              1,
+              1,
+              1
+            ],
+            "Transparency": 1
+          }
+        },
+        "Waypoint03": {
+          "$className": "Part",
+          "$properties": {
+            "Anchored": true,
+            "CanCollide": false,
+            "Position": [
+              38,
+              2,
+              34
+            ],
+            "Size": [
+              1,
+              1,
+              1
+            ],
+            "Transparency": 1
+          }
+        },
+        "Waypoint04": {
+          "$className": "Part",
+          "$properties": {
+            "Anchored": true,
+            "CanCollide": false,
+            "Position": [
+              22,
+              2,
+              34
+            ],
+            "Size": [
+              1,
+              1,
+              1
+            ],
+            "Transparency": 1
+          }
+        }
       },
       "SecurityCameras": {
         "$className": "Folder"

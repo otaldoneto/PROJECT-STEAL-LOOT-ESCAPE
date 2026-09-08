@@ -72,6 +72,28 @@ local guards = Workspace:FindFirstChild("Guards") or Instance.new("Folder")
 guards.Name = "Guards"
 guards.Parent = Workspace
 
+local guardWaypoints = Workspace:FindFirstChild("GuardWaypoints") or Instance.new("Folder")
+guardWaypoints.Name = "GuardWaypoints"
+guardWaypoints.Parent = Workspace
+
+if #guardWaypoints:GetChildren() == 0 then
+	for index, position in ipairs({
+		Vector3.new(22, 2, 18),
+		Vector3.new(38, 2, 18),
+		Vector3.new(38, 2, 34),
+		Vector3.new(22, 2, 34),
+	}) do
+		local waypoint = Instance.new("Part")
+		waypoint.Name = string.format("Waypoint%02d", index)
+		waypoint.Anchored = true
+		waypoint.CanCollide = false
+		waypoint.Transparency = 1
+		waypoint.Size = Vector3.new(1, 1, 1)
+		waypoint.Position = position
+		waypoint.Parent = guardWaypoints
+	end
+end
+
 local securityCameras = Workspace:FindFirstChild("SecurityCameras") or Instance.new("Folder")
 securityCameras.Name = "SecurityCameras"
 securityCameras.Parent = Workspace
@@ -124,7 +146,7 @@ EscapeService.Start(InventoryService, CurrencyService, LootService, escapeZone, 
 ThreatService.Start(guards, securityCameras, InventoryService, lobbySpawn)
 HideoutService.Start(hideouts)
 LobbyService.Start(EscapeService, CurrencyService, lootCounter, leaderboardBoard)
-RoundService.Start(InventoryService, LootService, EscapeService, ThreatService, HideoutService, ProgressionService, lobbySpawn, mapSpawn)
+Workspace:SetAttribute("ServicesReady", true)
 
 escapeDecisionRequest.OnServerEvent:Connect(function(player, decision)
 	if isRateLimited(player) then

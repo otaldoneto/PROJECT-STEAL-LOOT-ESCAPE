@@ -70,10 +70,15 @@ local function createDefaultGuard()
 	guard:SetAttribute("AttackDistance", 4)
 	guard:SetAttribute("Damage", 20)
 	guard:SetAttribute("AttackCooldown", 1.5)
+	guard:SetAttribute("PathfindingControlled", true)
+
+	local humanoid = Instance.new("Humanoid")
+	humanoid.WalkSpeed = 7
+	humanoid.Parent = guard
 
 	local root = Instance.new("Part")
 	root.Name = "HumanoidRootPart"
-	root.Anchored = true
+	root.Anchored = false
 	root.CanCollide = false
 	root.Size = Vector3.new(2, 4, 2)
 	root.Color = Color3.fromRGB(190, 55, 55)
@@ -82,13 +87,18 @@ local function createDefaultGuard()
 
 	local head = Instance.new("Part")
 	head.Name = "Head"
-	head.Anchored = true
+	head.Anchored = false
 	head.CanCollide = false
 	head.Shape = Enum.PartType.Ball
 	head.Size = Vector3.new(2, 2, 2)
 	head.Color = Color3.fromRGB(240, 190, 150)
 	head.Position = root.Position + Vector3.new(0, 3, 0)
 	head.Parent = guard
+
+	local weld = Instance.new("WeldConstraint")
+	weld.Part0 = root
+	weld.Part1 = head
+	weld.Parent = root
 
 	guard.PrimaryPart = root
 	guard.Parent = guardFolder
@@ -232,6 +242,12 @@ local function updateGuard(guard, state, deltaTime)
 			end
 			attackPlayer(state, targetPlayer, targetDistance)
 		end
+		if guard:GetAttribute("PathfindingControlled") then
+			return
+		end
+		return
+	end
+	if guard:GetAttribute("PathfindingControlled") then
 		return
 	end
 

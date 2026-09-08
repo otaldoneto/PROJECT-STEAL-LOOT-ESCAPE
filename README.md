@@ -20,6 +20,10 @@ O arquivo `default.project.json` monta `src/shared` em `ReplicatedStorage/Shared
 
 Os módulos em `src/shared` contêm apenas configurações e regras puras reutilizáveis: `InventoryConfig`, `ProgressionConfig`, `GameConfig` e `RiskConfig`. Eles podem ser lidos pelo cliente para renderização, mas nenhuma decisão de prêmio, compra, velocidade, risco, DataStore ou rodada depende do cliente. A lógica de autoridade permanece modularizada em `src/server`.
 
+O HUD simples de partida fica em `StarterGui.ScreenGui`, sincronizado por `src/client/ScreenGui/MatchStatus.client.lua`. Ele atualiza `MatchTime` usando `Workspace.RoundTimeLeft` e `BackpackStatus` usando `leaderstats.Mochila`, no formato `Mochila: atual/máximo`. O servidor publica `Mochila` como o número de slots ocupados e `InventorySlotsMax` como o limite.
+
+O `src/server/DataStoreManager.server.lua` carrega e salva `leaderstats.Moedas` e `leaderstats.MochilaNivel` com `DataStoreService`. O carregamento ocorre em `PlayerAdded`; o salvamento ocorre em `PlayerRemoving` e `BindToClose`, com `pcall`, três tentativas e bloqueio contra salvamentos concorrentes. Em falha de carregamento, `DataStoreReady` fica falso e os dados não são sobrescritos.
+
 ## Inventário
 
 O jogador pode abrir a mochila com `B`. Os objetos de teste ficam na pasta `Workspace/Loot` e são coletados por `ProximityPrompt`.
@@ -40,7 +44,7 @@ Os valores de descarregamento ficam em `src/shared/InventoryConfig.luau`, no cam
 
 Durante `Intermission`, jogadores ficam no `Workspace/LobbySpawn`. O `Workspace/LootCounter` é o balcão/NPC de venda: use `Sell Loot` para converter a venda pendente em `Money` ou `Points`. A venda é validada no servidor, salva pelo `CurrencyService` e registrada no OrderedDataStore `StealLootEscapeLeaderboard_v1`. O painel `Workspace/LeaderboardBoard` mostra os 10 maiores ladrões por valor vendido e é atualizado periodicamente.
 
-O ciclo é `Intermission` no lobby, `Active` no mapa de roubo e `Results` antes da próxima intermission. Jogadores que entram durante uma fase são enviados automaticamente ao spawn correto; jogadores no lobby não coletam loot nem são detectados.
+O ciclo é `Intermission` de 20 segundos no lobby, `Active` de 120 segundos no mapa de roubo e `Results` antes da próxima intermission. O `GameManager.server.lua` inicia o ciclo uma única vez depois que os serviços estão prontos. Jogadores que entram durante uma fase são enviados automaticamente ao spawn correto; jogadores no lobby não coletam loot nem são detectados.
 
 ## Progressão e Loja
 
@@ -63,6 +67,8 @@ Ao ser capturado pela primeira vez, o jogador é restaurado em um ponto seguro e
 ## Ameaças
 
 O servidor cria uma guarda e uma câmera de demonstração nas pastas `Workspace/Guards` e `Workspace/SecurityCameras` quando elas estão vazias. Guardas usam visão por cone e raycast, patrulham, perseguem jogadores detectados e aplicam dano com cooldown. Câmeras são configuradas por `VisionRange` e `VisionAngle`. O timer global dura 3 minutos e fica disponível em `Workspace.RoundTimeLeft`; ao acabar, jogadores que não escaparam recebem `TimeExpired`.
+
+O NPC de patrulha é controlado por `src/server/GuardController.server.lua`. Ele percorre os `BasePart`s de `Workspace/GuardWaypoints` em ordem de nome usando `PathfindingService`. Quando encontra linha de visão direta via `Raycast` a até 30 studs, interrompe a patrulha e persegue o jogador; após perder a visão por alguns segundos, retorna à rota. O servidor controla a movimentação e o guarda padrão usa `PathfindingControlled` para impedir dois controladores simultâneos.
 
 Guardas podem ser configuradas como `Model` com `PrimaryPart` ou `HumanoidRootPart`. Seus atributos opcionais são `VisionRange`, `VisionAngle`, `PatrolRadius`, `Speed`, `AttackDistance`, `Damage` e `AttackCooldown`. A detecção é calculada no servidor e exposta ao cliente apenas pelos atributos `Detected` e `ThreatLevel`.
 
