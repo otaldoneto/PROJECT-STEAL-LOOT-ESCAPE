@@ -150,6 +150,71 @@
           "Transparency": 0.5
         }
       },
+      "MapSpawn": {
+        "$className": "Part",
+        "$properties": {
+          "Anchored": true,
+          "CanCollide": false,
+          "Color": [
+            0.7451,
+            0.27451,
+            0.27451
+          ],
+          "Position": [
+            -18,
+            0.5,
+            18
+          ],
+          "Size": [
+            8,
+            1,
+            8
+          ],
+          "Transparency": 0.5
+        }
+      },
+      "LootCounter": {
+        "$className": "Part",
+        "$properties": {
+          "Anchored": true,
+          "Color": [
+            0.7451,
+            0.58824,
+            0.23529
+          ],
+          "Position": [
+            -20,
+            2,
+            -6
+          ],
+          "Size": [
+            8,
+            3,
+            3
+          ]
+        }
+      },
+      "LeaderboardBoard": {
+        "$className": "Part",
+        "$properties": {
+          "Anchored": true,
+          "Color": [
+            0.11765,
+            0.13725,
+            0.19608
+          ],
+          "Position": [
+            -30,
+            4,
+            -12
+          ],
+          "Size": [
+            12,
+            8,
+            1
+          ]
+        }
+      },
       "Guards": {
         "$className": "Folder"
       },

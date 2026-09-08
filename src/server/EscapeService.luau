@@ -10,6 +10,7 @@ local lobbySpawn
 local deliveryInProgress = {}
 local pendingChoices = {}
 local carryoverRewards = {}
+local pendingSales = {}
 
 local function canUseZone(player, zone)
 	local character = player.Character
@@ -38,6 +39,13 @@ local function clearChoice(player)
 	player:SetAttribute("EscapeChoicePending", false)
 end
 
+local function initializePlayer(player)
+	player:SetAttribute("EscapeStatus", "Collect loot and reach the escape zone")
+	player:SetAttribute("EscapeChoicePending", false)
+	player:SetAttribute("CarryoverReward", 0)
+	player:SetAttribute("LobbyStatus", "Use the lobby counter to sell escaped loot")
+end
+
 local function finishDelivery(player, rewardType, reward, decision)
 	if decision == "Stay" then
 		player:SetAttribute("InLobby", false)
@@ -46,18 +54,15 @@ local function finishDelivery(player, rewardType, reward, decision)
 		player:SetAttribute("EscapeStatus", string.format("Loot saved at 2x: %d %s next escape", carryoverRewards[player], rewardType))
 	else
 		local totalReward = reward + (carryoverRewards[player] or 0)
-		if not CurrencyService.CanAdd(player, rewardType, totalReward) then
-			return false, "Currency is not ready or full"
-		end
-		if not CurrencyService.Add(player, rewardType, totalReward) then
-			return false, "Could not deliver loot"
-		end
 		carryoverRewards[player] = 0
 		player:SetAttribute("CarryoverReward", 0)
 		player:SetAttribute("EscapeReward", totalReward)
-		player:SetAttribute("EscapeStatus", string.format("Escaped: +%d %s", totalReward, rewardType))
-		moveToLobby(player)
-	end
+		pendingSales[player] = {
+			Amount = totalReward,
+	Players.PlayerAdded:Connect(initializePlayer)
+			RewardType = rewardType,
+		}
+		initializePlayer(player)
 	player:SetAttribute("Escaped", true)
 	return true
 end
@@ -139,12 +144,14 @@ function EscapeService.Start(inventoryService, currencyService, lootService, zon
 		deliveryInProgress[player] = nil
 		pendingChoices[player] = nil
 		carryoverRewards[player] = nil
+		pendingSales[player] = nil
 	end)
 
 	for _, player in Players:GetPlayers() do
 		player:SetAttribute("EscapeStatus", "Collect loot and reach the escape zone")
 		player:SetAttribute("EscapeChoicePending", false)
 		player:SetAttribute("CarryoverReward", 0)
+		player:SetAttribute("LobbyStatus", "Use the lobby counter to sell escaped loot")
 	end
 end
 
@@ -161,6 +168,7 @@ function EscapeService.ResetRound()
 		player:SetAttribute("EscapeStatus", "Collect loot and reach the escape zone")
 		player:SetAttribute("EscapeChoicePending", false)
 		player:SetAttribute("InLobby", player:GetAttribute("InLobby") == true)
+		player:SetAttribute("LobbyStatus", "Use the lobby counter to sell escaped loot")
 	end
 end
 
@@ -186,6 +194,19 @@ function EscapeService.Decide(player, decision)
 		return false
 	end
 	return true
+end
+
+function EscapeService.GetPendingSale(player)
+	local sale = pendingSales[player]
+	if not sale then
+		return 0, "Money"
+	end
+	return sale.Amount, sale.RewardType
+end
+
+function EscapeService.ClearPendingSale(player)
+	pendingSales[player] = nil
+	player:SetAttribute("EscapeReward", 0)
 end
 
 return EscapeService

@@ -32,9 +32,15 @@ O servidor é a autoridade: peso, slots, stacks, distância da coleta, recompens
 
 ## Zona de Escape
 
-A área `Workspace/EscapeZone` usa `ProximityPrompt` e valida uma região retangular ao redor da peça no servidor. O jogador precisa estar vivo, dentro da área, na fase `Active` e carregando loot com `EscapeValue`. Ao escapar, o valor dos itens é convertido na moeda definida pelo atributo `RewardType` (`Money` ou `Points`), o inventário é descarregado e os atributos `Escaped` e `EscapeReward` são atualizados. O jogador pode fazer várias entregas na mesma rodada, desde que colete novo loot entre elas. O HUD mostra `EscapeStatus` quando a entrega é recusada ou concluída.
+Ao entrar em `Active`, o servidor teletransporta o jogador de `Workspace/LobbySpawn` para `Workspace/MapSpawn`. A área `Workspace/EscapeZone` usa `ProximityPrompt` e valida uma região retangular ao redor da peça no servidor. O jogador precisa estar vivo, dentro da área, na fase `Active` e carregando loot com `EscapeValue`. Ao escapar, o servidor registra o roubo, limpa o inventário e leva o jogador ao lobby; a `EscapeZone` não paga moedas. O HUD mostra `EscapeStatus` quando o roubo é recusado ou concluído.
 
 Os valores de descarregamento ficam em `src/shared/InventoryConfig.luau`, no campo `EscapeValue` de cada item.
+
+## Lobby, Venda e Leaderboard
+
+Durante `Intermission`, jogadores ficam no `Workspace/LobbySpawn`. O `Workspace/LootCounter` é o balcão/NPC de venda: use `Sell Loot` para converter a venda pendente em `Money` ou `Points`. A venda é validada no servidor, salva pelo `CurrencyService` e registrada no OrderedDataStore `StealLootEscapeLeaderboard_v1`. O painel `Workspace/LeaderboardBoard` mostra os 10 maiores ladrões por valor vendido e é atualizado periodicamente.
+
+O ciclo é `Intermission` no lobby, `Active` no mapa de roubo e `Results` antes da próxima intermission. Jogadores que entram durante uma fase são enviados automaticamente ao spawn correto; jogadores no lobby não coletam loot nem são detectados.
 
 ## Progressão e Loja
 

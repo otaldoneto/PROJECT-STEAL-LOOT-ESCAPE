@@ -9,6 +9,7 @@ local ThreatService = require(script:WaitForChild("ThreatService"))
 local RoundService = require(script:WaitForChild("RoundService"))
 local HideoutService = require(script:WaitForChild("HideoutService"))
 local ProgressionService = require(script:WaitForChild("ProgressionService"))
+local LobbyService = require(script:WaitForChild("LobbyService"))
 local requestTimestamps = {}
 
 local function isRateLimited(player)
@@ -89,6 +90,32 @@ lobbySpawn.Position = Vector3.new(-20, 0.5, -12)
 lobbySpawn.Color = Color3.fromRGB(80, 130, 220)
 lobbySpawn.Parent = Workspace
 
+local mapSpawn = Workspace:FindFirstChild("MapSpawn") or Instance.new("Part")
+mapSpawn.Name = "MapSpawn"
+mapSpawn.Anchored = true
+mapSpawn.CanCollide = false
+mapSpawn.Transparency = 0.5
+mapSpawn.Size = Vector3.new(8, 1, 8)
+mapSpawn.Position = Vector3.new(-18, 0.5, 18)
+mapSpawn.Color = Color3.fromRGB(190, 70, 70)
+mapSpawn.Parent = Workspace
+
+local lootCounter = Workspace:FindFirstChild("LootCounter") or Instance.new("Part")
+lootCounter.Name = "LootCounter"
+lootCounter.Anchored = true
+lootCounter.Size = Vector3.new(8, 3, 3)
+lootCounter.Position = Vector3.new(-20, 2, -6)
+lootCounter.Color = Color3.fromRGB(190, 150, 60)
+lootCounter.Parent = Workspace
+
+local leaderboardBoard = Workspace:FindFirstChild("LeaderboardBoard") or Instance.new("Part")
+leaderboardBoard.Name = "LeaderboardBoard"
+leaderboardBoard.Anchored = true
+leaderboardBoard.Size = Vector3.new(12, 8, 1)
+leaderboardBoard.Position = Vector3.new(-30, 4, -12)
+leaderboardBoard.Color = Color3.fromRGB(30, 35, 50)
+leaderboardBoard.Parent = Workspace
+
 InventoryService.Start(inventoryUpdated, inventorySnapshot)
 CurrencyService.Start()
 ProgressionService.Start(progressionUpdated, CurrencyService)
@@ -96,7 +123,8 @@ LootService.Start(InventoryService, CurrencyService, ThreatService, lootFolder)
 EscapeService.Start(InventoryService, CurrencyService, LootService, escapeZone, lobbySpawn)
 ThreatService.Start(guards, securityCameras, InventoryService, lobbySpawn)
 HideoutService.Start(hideouts)
-RoundService.Start(InventoryService, LootService, EscapeService, ThreatService, HideoutService, ProgressionService)
+LobbyService.Start(EscapeService, CurrencyService, lootCounter, leaderboardBoard)
+RoundService.Start(InventoryService, LootService, EscapeService, ThreatService, HideoutService, ProgressionService, lobbySpawn, mapSpawn)
 
 escapeDecisionRequest.OnServerEvent:Connect(function(player, decision)
 	if isRateLimited(player) then

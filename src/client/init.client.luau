@@ -75,6 +75,18 @@ escapeStatus.TextWrapped = true
 escapeStatus.TextXAlignment = Enum.TextXAlignment.Center
 escapeStatus.Parent = screenGui
 
+local lobbyStatus = Instance.new("TextLabel")
+lobbyStatus.Name = "LobbyStatus"
+lobbyStatus.AnchorPoint = Vector2.new(0.5, 1)
+lobbyStatus.Position = UDim2.new(0.5, 0, 1, -56)
+lobbyStatus.Size = UDim2.fromOffset(560, 28)
+lobbyStatus.BackgroundTransparency = 1
+lobbyStatus.TextColor3 = Color3.fromRGB(245, 220, 120)
+lobbyStatus.TextSize = 16
+lobbyStatus.TextWrapped = true
+lobbyStatus.TextXAlignment = Enum.TextXAlignment.Center
+lobbyStatus.Parent = screenGui
+
 local decisionPanel = Instance.new("Frame")
 decisionPanel.Name = "EscapeDecisionPanel"
 decisionPanel.AnchorPoint = Vector2.new(0.5, 0.5)
@@ -244,6 +256,13 @@ end
 player:GetAttributeChangedSignal("EscapeStatus"):Connect(renderEscapeStatus)
 player:GetAttributeChangedSignal("Escaped"):Connect(renderEscapeStatus)
 renderEscapeStatus()
+
+local function renderLobbyStatus()
+	lobbyStatus.Text = player:GetAttribute("LobbyStatus") or ""
+end
+
+player:GetAttributeChangedSignal("LobbyStatus"):Connect(renderLobbyStatus)
+renderLobbyStatus()
 
 stayButton.Activated:Connect(function()
 	decisionPanel.Visible = false

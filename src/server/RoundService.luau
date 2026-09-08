@@ -10,6 +10,8 @@ local ThreatService
 local InventoryService
 local HideoutService
 local ProgressionService
+local lobbySpawn
+local mapSpawn
 local roundNumber = 0
 local running = false
 
@@ -42,7 +44,37 @@ local function resetPlayers()
 		player:SetAttribute("CaughtCount", 0)
 		player:SetAttribute("ItemsLost", false)
 		player:SetAttribute("CaptureStatus", "")
+		player:SetAttribute("LobbyStatus", "Use the lobby counter to sell escaped loot")
 	end
+end
+
+local function teleportPlayer(player, spawnPart)
+	local character = player.Character
+	if character and spawnPart then
+		character:PivotTo(spawnPart.CFrame + Vector3.new(0, 3, 0))
+	end
+end
+
+local function teleportAll(spawnPart, inLobby)
+	for _, player in Players:GetPlayers() do
+		teleportPlayer(player, spawnPart)
+		player:SetAttribute("InLobby", inLobby)
+	end
+end
+
+local function setupPlayer(player)
+	player:SetAttribute("InLobby", true)
+	player.CharacterAdded:Connect(function()
+		task.defer(function()
+			if Workspace:GetAttribute("RoundPhase") == "Active" then
+				teleportPlayer(player, mapSpawn)
+				player:SetAttribute("InLobby", false)
+			else
+				teleportPlayer(player, lobbySpawn)
+				player:SetAttribute("InLobby", true)
+			end
+		end)
+	end)
 end
 
 local function countdown(duration, expectedPhase)
@@ -61,6 +93,7 @@ local function runRound()
 	while running do
 		roundNumber += 1
 		setPhase("Intermission", INTERMISSION_DURATION)
+		teleportAll(lobbySpawn, true)
 		resetPlayers()
 		InventoryService.SetRoundActive(false)
 		ProgressionService.ResetSprint()
@@ -72,6 +105,7 @@ local function runRound()
 		end
 
 		HideoutService.ResetRound()
+		teleportAll(mapSpawn, false)
 		resetPlayers()
 		InventoryService.SetRoundActive(true)
 		LootService.ResetRound()
@@ -96,14 +130,20 @@ local function runRound()
 	end
 end
 
-function RoundService.Start(inventoryService, lootService, escapeService, threatService, hideoutService, progressionService)
-	assert(inventoryService and lootService and escapeService and threatService and hideoutService and progressionService, "RoundService dependencies are required")
+function RoundService.Start(inventoryService, lootService, escapeService, threatService, hideoutService, progressionService, lobbyPart, mapPart)
+	assert(inventoryService and lootService and escapeService and threatService and hideoutService and progressionService and lobbyPart and mapPart, "RoundService dependencies are required")
 	InventoryService = inventoryService
 	LootService = lootService
 	EscapeService = escapeService
 	ThreatService = threatService
 	HideoutService = hideoutService
 	ProgressionService = progressionService
+	lobbySpawn = lobbyPart
+	mapSpawn = mapPart
+	Players.PlayerAdded:Connect(setupPlayer)
+	for _, player in Players:GetPlayers() do
+		setupPlayer(player)
+	end
 	if running then
 		return
 	end
