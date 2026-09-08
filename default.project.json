@@ -80,7 +80,9 @@
           "$className": "Part",
           "$attributes": {
             "RewardType": "Money",
-            "Reward": 100
+            "Reward": 100,
+            "RiskLevel": 2,
+            "RiskDuration": 25
           },
           "$properties": {
             "Anchored": true,
@@ -132,6 +134,59 @@
       },
       "SecurityCameras": {
         "$className": "Folder"
+      },
+      "Hideouts": {
+        "$className": "Folder",
+        "Locker": {
+          "$className": "Part",
+          "$attributes": {
+            "DisplayName": "Locker"
+          },
+          "$properties": {
+            "Anchored": true,
+            "CanCollide": true,
+            "Color": [
+              0.2,
+              0.24,
+              0.3
+            ],
+            "Position": [
+              14,
+              3,
+              8
+            ],
+            "Size": [
+              4,
+              6,
+              3
+            ]
+          }
+        },
+        "Dumpster": {
+          "$className": "Part",
+          "$attributes": {
+            "DisplayName": "Dumpster"
+          },
+          "$properties": {
+            "Anchored": true,
+            "CanCollide": true,
+            "Color": [
+              0.16,
+              0.34,
+              0.2
+            ],
+            "Position": [
+              -14,
+              2,
+              8
+            ],
+            "Size": [
+              5,
+              4,
+              4
+            ]
+          }
+        }
       }
     },
     "Lighting": {

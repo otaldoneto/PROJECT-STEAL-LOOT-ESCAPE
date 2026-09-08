@@ -6,6 +6,9 @@ local LootService = require(script:WaitForChild("LootService"))
 local CurrencyService = require(script:WaitForChild("CurrencyService"))
 local EscapeService = require(script:WaitForChild("EscapeService"))
 local ThreatService = require(script:WaitForChild("ThreatService"))
+local RoundService = require(script:WaitForChild("RoundService"))
+local HideoutService = require(script:WaitForChild("HideoutService"))
+local ProgressionService = require(script:WaitForChild("ProgressionService"))
 local requestTimestamps = {}
 
 local function isRateLimited(player)
@@ -34,6 +37,18 @@ local inventorySnapshot = remotes:FindFirstChild("InventorySnapshot") or Instanc
 inventorySnapshot.Name = "InventorySnapshot"
 inventorySnapshot.Parent = remotes
 
+local progressionUpdated = remotes:FindFirstChild("ProgressionUpdated") or Instance.new("RemoteEvent")
+progressionUpdated.Name = "ProgressionUpdated"
+progressionUpdated.Parent = remotes
+
+local progressionRequest = remotes:FindFirstChild("ProgressionRequest") or Instance.new("RemoteEvent")
+progressionRequest.Name = "ProgressionRequest"
+progressionRequest.Parent = remotes
+
+local sprintRequest = remotes:FindFirstChild("SprintRequest") or Instance.new("RemoteEvent")
+sprintRequest.Name = "SprintRequest"
+sprintRequest.Parent = remotes
+
 local lootFolder = Workspace:FindFirstChild("Loot") or Instance.new("Folder")
 lootFolder.Name = "Loot"
 lootFolder.Parent = Workspace
@@ -56,11 +71,36 @@ local securityCameras = Workspace:FindFirstChild("SecurityCameras") or Instance.
 securityCameras.Name = "SecurityCameras"
 securityCameras.Parent = Workspace
 
+local hideouts = Workspace:FindFirstChild("Hideouts") or Instance.new("Folder")
+hideouts.Name = "Hideouts"
+hideouts.Parent = Workspace
+
 InventoryService.Start(inventoryUpdated, inventorySnapshot)
 CurrencyService.Start()
-LootService.Start(InventoryService, CurrencyService, lootFolder)
+ProgressionService.Start(progressionUpdated, CurrencyService)
+LootService.Start(InventoryService, CurrencyService, ThreatService, lootFolder)
 EscapeService.Start(InventoryService, CurrencyService, escapeZone)
 ThreatService.Start(guards, securityCameras)
+HideoutService.Start(hideouts)
+RoundService.Start(InventoryService, LootService, EscapeService, ThreatService, HideoutService, ProgressionService)
+
+progressionRequest.OnServerEvent:Connect(function(player, action)
+	if isRateLimited(player) then
+		return
+	end
+	if action == "BuySprint" then
+		ProgressionService.BuySprint(player)
+	end
+end)
+
+sprintRequest.OnServerEvent:Connect(function(player, isSprinting)
+	if isRateLimited(player) then
+		return
+	end
+	if typeof(isSprinting) == "boolean" then
+		ProgressionService.SetSprinting(player, isSprinting)
+	end
+end)
 
 inventoryRequest.OnServerEvent:Connect(function(player, action, itemId, amount)
 	if isRateLimited(player) then

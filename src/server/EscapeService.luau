@@ -1,4 +1,5 @@
 local Players = game:GetService("Players")
+local Workspace = game:GetService("Workspace")
 
 local EscapeService = {}
 local InventoryService
@@ -36,7 +37,7 @@ local function setupPrompt()
 		end
 
 		local reward = InventoryService.GetDepositValue(player)
-		if reward < 1 or not CurrencyService.CanAdd(player, rewardType, reward) then
+		if Workspace:GetAttribute("RoundPhase") ~= "Active" or reward < 1 or not CurrencyService.CanAdd(player, rewardType, reward) then
 			return
 		end
 
@@ -62,6 +63,16 @@ function EscapeService.Start(inventoryService, currencyService, zone)
 	Players.PlayerRemoving:Connect(function(player)
 		escapedPlayers[player] = nil
 	end)
+end
+
+function EscapeService.ResetRound()
+	escapedPlayers = {}
+	if escapeZone then
+		local prompt = escapeZone:FindFirstChildOfClass("ProximityPrompt")
+		if prompt then
+			prompt.Enabled = true
+		end
+	end
 end
 
 return EscapeService

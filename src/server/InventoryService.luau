@@ -11,6 +11,7 @@ local loaded = {}
 local saveAllowed = {}
 local snapshotTimestamps = {}
 local inventoryUpdated
+local roundActive = false
 
 local function isPositiveInteger(value)
 	return typeof(value) == "number" and value > 0 and value % 1 == 0 and value < 1000
@@ -68,6 +69,11 @@ local function loadInventory(player)
 
 	if success then
 		loadItems(inventory, data)
+		if roundActive then
+			table.clear(inventory.Items)
+			inventory.SlotCount = 0
+			inventory.Weight = 0
+		end
 		saveAllowed[player] = true
 	else
 		warn(string.format("Could not load inventory for %s; saving is disabled for this session", player.Name))
@@ -238,6 +244,19 @@ function InventoryService.ClearItems(player)
 	inventory.Weight = 0
 	publish(player)
 	return true
+end
+
+function InventoryService.ResetRound()
+	for player in pairs(inventories) do
+		InventoryService.ClearItems(player)
+	end
+end
+
+function InventoryService.SetRoundActive(isActive)
+	roundActive = isActive == true
+	if roundActive then
+		InventoryService.ResetRound()
+	end
 end
 
 function InventoryService.Start(inventoryUpdatedRemote, snapshotRemote)

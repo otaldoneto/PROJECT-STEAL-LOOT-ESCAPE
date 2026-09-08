@@ -150,6 +150,24 @@ function CurrencyService.CanAdd(player, currencyType, amount)
 	return playerBalances[currencyType] + amount <= 1000000000
 end
 
+function CurrencyService.Spend(player, currencyType, amount)
+	if typeof(player) ~= "Instance" or not player:IsA("Player") or not isCurrencyType(currencyType) then
+		return false, "Invalid currency request"
+	end
+	if typeof(amount) ~= "number" or amount < 1 or amount % 1 ~= 0 or not loaded[player] then
+		return false, "Currency is not ready"
+	end
+
+	local playerBalances = balances[player]
+	if playerBalances[currencyType] < amount then
+		return false, "Not enough currency"
+	end
+
+	playerBalances[currencyType] -= amount
+	publish(player)
+	return true
+end
+
 function CurrencyService.Start()
 	Players.PlayerAdded:Connect(function(player)
 		task.spawn(loadCurrency, player)

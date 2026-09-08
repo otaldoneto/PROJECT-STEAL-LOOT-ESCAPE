@@ -14,13 +14,19 @@ Next, open `Steal-Loot-Escape.rbxlx` in Roblox Studio and start the Rojo server:
 rojo serve
 ```
 
+## Organização Rojo
+
+O arquivo `default.project.json` monta `src/shared` em `ReplicatedStorage/Shared`, `src/server` em `ServerScriptService/Server` e `src/client` em `StarterPlayerScripts/Client`. Para instalar a ferramenta fixada pelo projeto, use `aftman install`; para sincronizar alterações com o Studio, execute `rojo serve` e conecte o plugin Rojo.
+
+Os módulos em `src/shared` contêm apenas configurações e regras puras reutilizáveis: `InventoryConfig`, `ProgressionConfig`, `GameConfig` e `RiskConfig`. Eles podem ser lidos pelo cliente para renderização, mas nenhuma decisão de prêmio, compra, velocidade, risco, DataStore ou rodada depende do cliente. A lógica de autoridade permanece modularizada em `src/server`.
+
 ## Inventário
 
 O jogador pode abrir a mochila com `B`. Os objetos de teste ficam na pasta `Workspace/Loot` e são coletados por `ProximityPrompt`.
 
 As regras ficam em `src/shared/InventoryConfig.luau`. Para adicionar loot de inventário ao mapa, crie uma `BasePart` dentro de `Workspace/Loot` com os atributos `ItemId` e `Amount`. O item precisa existir no catálogo e a quantidade não pode ultrapassar `MaxStack`.
 
-Para loot de recompensa, use os atributos `RewardType` (`Money` ou `Points`) e `Reward` (inteiro positivo). Cada objeto só pode ser coletado uma vez por sessão, e o servidor valida distância, personagem vivo, tipo e valor antes de conceder a recompensa. `Money` e `Points` são publicados como atributos do jogador e em `leaderstats`, além de serem salvos no DataStore `StealLootEscapeCurrency_v1`.
+Para loot de recompensa, use os atributos `RewardType` (`Money` ou `Points`) e `Reward` (inteiro positivo). Cada objeto só pode ser coletado uma vez por rodada, e o servidor restaura os objetos no início da rodada seguinte. O servidor valida distância, personagem vivo, tipo e valor antes de conceder a recompensa. `Money` e `Points` são publicados como atributos do jogador e em `leaderstats`, além de serem salvos no DataStore `StealLootEscapeCurrency_v1`.
 
 O servidor é a autoridade: peso, slots, stacks, distância da coleta, recompensas e remoção são validados no servidor. O inventário é salvo no DataStore `StealLootEscapeInventory_v1`.
 
@@ -30,11 +36,33 @@ A área `Workspace/EscapeZone` usa `ProximityPrompt`. O jogador precisa estar vi
 
 Os valores de descarregamento ficam em `src/shared/InventoryConfig.luau`, no campo `EscapeValue` de cada item.
 
+## Progressão e Loja
+
+A loja abre com `M`. O botão de Sprint envia somente uma intenção de compra; o servidor valida o nível atual, o custo definido em `src/shared/ProgressionConfig.luau` e o saldo `Money` antes de gastar. Os níveis de Sprint são permanentes e ficam salvos no DataStore `StealLootEscapeProgression_v1`. O progresso só é aceito após carregamento bem-sucedido, evitando compras em uma sessão sem persistência.
+
+Durante a fase `Active`, segure `LeftShift` para correr. A velocidade é aplicada pelo servidor conforme o nível persistido, e o cliente não pode escolher o valor. O Sprint é interrompido ao esconder-se, escapar, morrer ou perder o foco da janela.
+
+## Risco dos Itens e Tempo
+
+Cada loot possui `RiskLevel` de `0` a `2` e `RiskDuration` em segundos. `0` é baixo, `1` é médio e `2` é alto. O risco médio aumenta o alcance efetivo de guardas e câmeras em 10%; o risco alto aumenta em 25% e mantém o jogador detectado durante a duração configurada. O servidor valida esses valores antes de registrar o risco. O `GoldBar` de exemplo é de risco alto; `Bandage` é baixo e `Keycard` é médio.
+
+O timer é controlado pelo `RoundService`: a fase `Active` dura 180 segundos e `TimerWarning` fica ativo nos últimos 30 segundos. O HUD exibe a fase, o tempo, o alerta e o risco atual; esses dados são somente leitura no cliente.
+
+O ciclo de partida é controlado apenas pelo servidor: `Intermission` de 10 segundos, `Active` de 3 minutos e `Results` de 8 segundos. No início de uma rodada ativa, o loot do mapa é restaurado e o inventário carregado da rodada anterior é descartado; o jogador precisa coletar novamente e escapar. O cliente apenas exibe `RoundPhase`, `RoundTimeLeft` e os estados replicados, sem poder iniciar, acelerar ou encerrar a rodada.
+
 ## Ameaças
 
 O servidor cria uma guarda e uma câmera de demonstração nas pastas `Workspace/Guards` e `Workspace/SecurityCameras` quando elas estão vazias. Guardas usam visão por cone e raycast, patrulham, perseguem jogadores detectados e aplicam dano com cooldown. Câmeras são configuradas por `VisionRange` e `VisionAngle`. O timer global dura 3 minutos e fica disponível em `Workspace.RoundTimeLeft`; ao acabar, jogadores que não escaparam recebem `TimeExpired`.
 
 Guardas podem ser configuradas como `Model` com `PrimaryPart` ou `HumanoidRootPart`. Seus atributos opcionais são `VisionRange`, `VisionAngle`, `PatrolRadius`, `Speed`, `AttackDistance`, `Damage` e `AttackCooldown`. A detecção é calculada no servidor e exposta ao cliente apenas pelos atributos `Detected` e `ThreatLevel`.
+
+## Esconderijos
+
+Os esconderijos ficam em `Workspace/Hideouts` e são `BasePart` com `ProximityPrompt` criado pelo servidor. O jogador pode entrar em um armário ou lixeira durante a fase `Active`; cada esconderijo aceita somente um ocupante. Enquanto escondido, o personagem fica invisível e imobilizado, e guardas/câmeras não o detectam. A saída só ocorre pelo próprio prompt, com validação server-side. Morte, saída do jogador, troca de rodada e fim da rodada liberam o esconderijo e restauram o personagem.
+
+## Verificação e Segurança
+
+O projeto não contém chaves ou credenciais: DataStoreService usa somente nomes públicos de stores, e nenhum segredo é armazenado no código. Para validar localmente, execute `rojo build -o "Steal-Loot-Escape.rbxlx"` e confira o diagnóstico do Studio. Testes de DataStore exigem uma experiência publicada e **Enable Studio Access to API Services** habilitado; sem acesso, o salvamento é desativado para evitar sobrescrever dados.
 
 Para testar persistência no Studio, publique a experiência e habilite **Game Settings > Security > Enable Studio Access to API Services**. Sem acesso ao DataStore, o jogo inicia sem dados persistidos e desativa o salvamento para evitar sobrescrever o inventário do jogador.
 

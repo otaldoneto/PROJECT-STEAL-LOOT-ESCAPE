@@ -1,16 +1,18 @@
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local Workspace = game:GetService("Workspace")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RiskConfig = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("RiskConfig"))
 
 local ThreatService = {}
 local guardFolder
 local cameraFolder
 local guardStates = {}
 local running = false
-local elapsedRoundTime = 0
 local detectionSources = {}
-
-local ROUND_DURATION = 180
+local roundActive = false
+local riskUntil = {}
+local riskLevels = {}
 
 local function getNumberAttribute(instance, name, default, minimum, maximum)
 	local value = instance:GetAttribute(name)
@@ -118,13 +120,30 @@ local function setDetection(player, source)
 	detectionSources[player][source] = true
 end
 
+local function getRiskName(level)
+	return RiskConfig.GetName(level)
+end
+
+local function isRiskActive(player)
+	return (riskUntil[player] or 0) > os.clock()
+end
+
 local function updateDetectionAttributes()
 	for _, player in Players:GetPlayers() do
 		local sources = detectionSources[player]
 		local detected = sources and next(sources) ~= nil or false
+		local riskLevel = isRiskActive(player) and (riskLevels[player] or 0) or 0
+		if riskLevel >= 2 then
+			detected = true
+		end
 		player:SetAttribute("Detected", detected)
-		player:SetAttribute("ThreatLevel", detected and "High" or "Safe")
+		player:SetAttribute("ThreatLevel", detected and "High" or (riskLevel == 1 and "Medium" or "Safe"))
+		player:SetAttribute("LootRisk", getRiskName(riskLevel))
 		detectionSources[player] = nil
+		if not isRiskActive(player) then
+			riskUntil[player] = nil
+			riskLevels[player] = nil
+		end
 	end
 end
 
@@ -135,7 +154,8 @@ local function scanCameras()
 			local angle = getNumberAttribute(camera, "VisionAngle", 80, 10, 180)
 			for _, player in Players:GetPlayers() do
 				local root = getCharacterRoot(player)
-				if root and not player:GetAttribute("Escaped") and canSee(camera.Position, camera.CFrame.LookVector, root.Position, range, angle, camera, root) then
+				local riskMultiplier = RiskConfig.GetVisionMultiplier(riskLevels[player] or 0)
+				if root and not player:GetAttribute("Escaped") and not player:GetAttribute("Hidden") and canSee(camera.Position, camera.CFrame.LookVector, root.Position, range * riskMultiplier, angle, camera, root) then
 					setDetection(player, camera)
 				end
 			end
@@ -169,9 +189,10 @@ local function updateGuard(guard, state, deltaTime)
 	local targetDistance = math.huge
 	for _, player in Players:GetPlayers() do
 		local playerRoot = getCharacterRoot(player)
-		if playerRoot and not player:GetAttribute("Escaped") then
+		if playerRoot and not player:GetAttribute("Escaped") and not player:GetAttribute("Hidden") then
+			local riskMultiplier = RiskConfig.GetVisionMultiplier(riskLevels[player] or 0)
 			local distance = (playerRoot.Position - root.Position).Magnitude
-			if distance < targetDistance and canSee(root.Position, root.CFrame.LookVector, playerRoot.Position, state.VisionRange, state.VisionAngle, guard, playerRoot) then
+			if distance < targetDistance and canSee(root.Position, root.CFrame.LookVector, playerRoot.Position, state.VisionRange * riskMultiplier, state.VisionAngle, guard, playerRoot) then
 				targetPlayer = player
 				targetDistance = distance
 			end
@@ -199,25 +220,15 @@ local function updateGuard(guard, state, deltaTime)
 	guard:PivotTo(CFrame.lookAt(patrolPosition, state.Origin))
 end
 
-local function updateRound(deltaTime)
-	elapsedRoundTime += deltaTime
-	local timeLeft = math.max(0, math.ceil(ROUND_DURATION - elapsedRoundTime))
-	Workspace:SetAttribute("RoundTimeLeft", timeLeft)
-	Workspace:SetAttribute("RoundActive", timeLeft > 0)
-	if timeLeft == 0 then
-		for _, player in Players:GetPlayers() do
-			if not player:GetAttribute("Escaped") then
-				player:SetAttribute("TimeExpired", true)
-			end
-		end
-	end
-end
-
 local function initializePlayer(player)
 	player:SetAttribute("Detected", false)
 	player:SetAttribute("ThreatLevel", "Safe")
 	player:SetAttribute("TimeExpired", not Workspace:GetAttribute("RoundActive"))
 	player:SetAttribute("Caught", false)
+	player:SetAttribute("Hidden", false)
+	player:SetAttribute("Hideout", "")
+	player:SetAttribute("HideoutWasSprinting", false)
+	player:SetAttribute("LootRisk", "Low")
 end
 
 function ThreatService.Start(guards, cameras)
@@ -251,7 +262,35 @@ function ThreatService.Start(guards, cameras)
 		end
 	end
 
-	Workspace:SetAttribute("RoundTimeLeft", ROUND_DURATION)
+	function ThreatService.SetRoundActive(isActive)
+		roundActive = isActive == true
+		if not roundActive then
+			for _, player in Players:GetPlayers() do
+				player:SetAttribute("Detected", false)
+				player:SetAttribute("ThreatLevel", "Safe")
+				player:SetAttribute("LootRisk", "Low")
+			end
+			detectionSources = {}
+			riskUntil = {}
+			riskLevels = {}
+		end
+	end
+
+	function ThreatService.ResetRound(duration)
+		for guard, state in pairs(guardStates) do
+			local root = getGuardRoot(guard)
+			if root then
+				guard:PivotTo(CFrame.lookAt(state.Origin, state.Origin + Vector3.new(0, 0, -1)))
+				state.LastAttack = 0
+				state.PatrolTime = 0
+			end
+		end
+		Workspace:SetAttribute("RoundTimeLeft", duration)
+		Workspace:SetAttribute("RoundActive", true)
+		Workspace:SetAttribute("RoundPhase", "Active")
+	end
+
+	Workspace:SetAttribute("RoundTimeLeft", 0)
 	Workspace:SetAttribute("RoundActive", true)
 	Players.PlayerAdded:Connect(initializePlayer)
 	for _, player in Players:GetPlayers() do
@@ -263,7 +302,6 @@ function ThreatService.Start(guards, cameras)
 	end
 	running = true
 	RunService.Heartbeat:Connect(function(deltaTime)
-		updateRound(deltaTime)
 		if Workspace:GetAttribute("RoundActive") then
 			for guard, state in pairs(guardStates) do
 				updateGuard(guard, state, math.min(deltaTime, 0.1))
@@ -272,6 +310,19 @@ function ThreatService.Start(guards, cameras)
 		end
 		updateDetectionAttributes()
 	end)
+end
+
+function ThreatService.MarkRisk(player, level, duration)
+	if typeof(player) ~= "Instance" or not player:IsA("Player") or not roundActive then
+		return false
+	end
+	if not RiskConfig.IsValid(level, duration) then
+		return false
+	end
+	riskLevels[player] = math.max(riskLevels[player] or 0, level)
+	riskUntil[player] = math.max(riskUntil[player] or 0, os.clock() + duration)
+	player:SetAttribute("LootRisk", getRiskName(riskLevels[player]))
+	return true
 end
 
 return ThreatService
