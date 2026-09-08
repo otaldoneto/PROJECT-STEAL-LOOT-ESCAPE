@@ -2,11 +2,13 @@
 ---@diagnostic disable: undefined-global
 
 local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Workspace = game:GetService("Workspace")
 
 local player = Players.LocalPlayer
 local screenGui = script.Parent
 local leaderstats = player:WaitForChild("leaderstats")
+local matchTime = ReplicatedStorage:WaitForChild("MatchTime")
 
 local function getOrCreateLabel(name, position)
 	local label = screenGui:FindFirstChild(name)
@@ -31,14 +33,7 @@ local timeLabel = getOrCreateLabel("MatchTime", UDim2.fromOffset(20, 20))
 local backpackLabel = getOrCreateLabel("BackpackStatus", UDim2.fromOffset(20, 62))
 
 local function renderTime()
-	local timeLeft = Workspace:GetAttribute("RoundTimeLeft")
-	if typeof(timeLeft) ~= "number" then
-		timeLabel.Text = "Tempo: --:--"
-		return
-	end
-
-	timeLeft = math.max(0, math.floor(timeLeft))
-	timeLabel.Text = string.format("Tempo: %02d:%02d", math.floor(timeLeft / 60), timeLeft % 60)
+	timeLabel.Text = matchTime.Value
 end
 
 local function renderBackpack()
@@ -49,6 +44,7 @@ local function renderBackpack()
 end
 
 Workspace:GetAttributeChangedSignal("RoundTimeLeft"):Connect(renderTime)
+matchTime.Changed:Connect(renderTime)
 leaderstats.ChildAdded:Connect(function(child)
 	if child.Name == "Mochila" then
 		child:GetPropertyChangedSignal("Value"):Connect(renderBackpack)

@@ -14,8 +14,11 @@ local waypointFolder = Workspace:WaitForChild("GuardWaypoints")
 local controllers = {}
 
 local MAX_VISION_DISTANCE = 30
-local LOST_SIGHT_GRACE = 2
+local FRONT_VISION_ANGLE = 120
+local LOST_SIGHT_GRACE = 5
 local UPDATE_INTERVAL = 0.25
+local PATROL_SPEED = 7
+local CHASE_SPEED = 18
 
 local function getRootAndHumanoid(guard)
 	local root = guard:FindFirstChild("HumanoidRootPart")
@@ -50,6 +53,10 @@ local function canSeePlayer(guard, player)
 
 	local offset = playerRoot.Position - guardRoot.Position
 	if offset.Magnitude > MAX_VISION_DISTANCE then
+		return false, playerRoot
+	end
+	local direction = offset.Unit
+	if guardRoot.CFrame.LookVector:Dot(direction) < math.cos(math.rad(FRONT_VISION_ANGLE / 2)) then
 		return false, playerRoot
 	end
 
@@ -118,6 +125,7 @@ local function startController(guard)
 		return
 	end
 	controllers[guard] = true
+	humanoid.WalkSpeed = PATROL_SPEED
 	for _, descendant in guard:GetDescendants() do
 		if descendant:IsA("BasePart") then
 			descendant:SetNetworkOwner(nil)
@@ -129,21 +137,31 @@ local function startController(guard)
 		local waypointIndex = 1
 		local lastSeenAt = 0
 		local lastTargetPosition
+		local targetPlayer
 		while guard.Parent == guardFolder and humanoid.Health > 0 do
 			if Workspace:GetAttribute("RoundPhase") ~= "Active" then
 				humanoid:MoveTo(root.Position)
 			else
 				local target = findVisiblePlayer(guard)
 				if target then
+					targetPlayer = target
 					lastSeenAt = os.clock()
-					lastTargetPosition = target.Character.HumanoidRootPart.Position
+					local targetRoot = target.Character and target.Character:FindFirstChild("HumanoidRootPart")
+					lastTargetPosition = targetRoot and targetRoot.Position or nil
 				elseif os.clock() - lastSeenAt > LOST_SIGHT_GRACE then
+					targetPlayer = nil
 					lastTargetPosition = nil
 				end
 
 				if lastTargetPosition then
-					moveToward(humanoid, root, lastTargetPosition)
+					humanoid.WalkSpeed = CHASE_SPEED
+					local targetRoot = targetPlayer and targetPlayer.Character and targetPlayer.Character:FindFirstChild("HumanoidRootPart")
+					if targetRoot and targetRoot.Parent then
+						lastTargetPosition = targetRoot.Position
+					end
+					humanoid:MoveTo(lastTargetPosition)
 				elseif #waypoints > 0 then
+					humanoid.WalkSpeed = PATROL_SPEED
 					local waypoint = waypoints[waypointIndex]
 					if (root.Position - waypoint.Position).Magnitude <= 4 then
 						waypointIndex = waypointIndex % #waypoints + 1
@@ -151,6 +169,7 @@ local function startController(guard)
 					end
 					moveToward(humanoid, root, waypoint.Position)
 				else
+					humanoid.WalkSpeed = PATROL_SPEED
 					humanoid:MoveTo(root.Position)
 				end
 			end

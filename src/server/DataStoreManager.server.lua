@@ -68,6 +68,19 @@ local function publish(player, data)
 	player:SetAttribute("MochilaNivel", data.MochilaNivel)
 end
 
+local function publishDefaultsWithoutSaving(player)
+	local data = {
+		Moedas = DEFAULT_COINS,
+		MochilaNivel = DEFAULT_BACKPACK_LEVEL,
+	}
+	local leaderstats = getLeaderstats(player)
+	getOrCreateIntValue(leaderstats, "Moedas", data.Moedas).Value = data.Moedas
+	getOrCreateIntValue(leaderstats, "MochilaNivel", data.MochilaNivel).Value = data.MochilaNivel
+	player:SetAttribute("DataStoreReady", false)
+	player:SetAttribute("Moedas", data.Moedas)
+	player:SetAttribute("MochilaNivel", data.MochilaNivel)
+end
+
 local function loadPlayer(player)
 	local data = {
 		Moedas = DEFAULT_COINS,
@@ -85,7 +98,7 @@ local function loadPlayer(player)
 	end
 
 	if not success then
-		player:SetAttribute("DataStoreReady", false)
+		publishDefaultsWithoutSaving(player)
 		warn(string.format("Could not load player data for %s; saving is disabled", player.Name))
 		return
 	end

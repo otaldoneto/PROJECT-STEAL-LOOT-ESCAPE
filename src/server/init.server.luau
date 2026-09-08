@@ -102,25 +102,37 @@ local hideouts = Workspace:FindFirstChild("Hideouts") or Instance.new("Folder")
 hideouts.Name = "Hideouts"
 hideouts.Parent = Workspace
 
-local lobbySpawn = Workspace:FindFirstChild("LobbySpawn") or Instance.new("Part")
-lobbySpawn.Name = "LobbySpawn"
+local lobby = Workspace:FindFirstChild("Lobby") or Instance.new("Folder")
+lobby.Name = "Lobby"
+lobby.Parent = Workspace
+
+local lobbySpawn = lobby:FindFirstChild("SpawnLocation") or Workspace:FindFirstChild("LobbySpawn") or Instance.new("Part")
+lobbySpawn.Name = "SpawnLocation"
 lobbySpawn.Anchored = true
 lobbySpawn.CanCollide = false
 lobbySpawn.Transparency = 0.5
 lobbySpawn.Size = Vector3.new(8, 1, 8)
 lobbySpawn.Position = Vector3.new(-20, 0.5, -12)
 lobbySpawn.Color = Color3.fromRGB(80, 130, 220)
-lobbySpawn.Parent = Workspace
+if lobbySpawn.Parent ~= lobby then
+	lobbySpawn.Parent = lobby
+end
 
-local mapSpawn = Workspace:FindFirstChild("MapSpawn") or Instance.new("Part")
-mapSpawn.Name = "MapSpawn"
+local map = Workspace:FindFirstChild("Map") or Instance.new("Folder")
+map.Name = "Map"
+map.Parent = Workspace
+
+local mapSpawn = map:FindFirstChild("SpawnLocation") or Workspace:FindFirstChild("MapSpawn") or Instance.new("Part")
+mapSpawn.Name = "SpawnLocation"
 mapSpawn.Anchored = true
 mapSpawn.CanCollide = false
 mapSpawn.Transparency = 0.5
 mapSpawn.Size = Vector3.new(8, 1, 8)
 mapSpawn.Position = Vector3.new(-18, 0.5, 18)
 mapSpawn.Color = Color3.fromRGB(190, 70, 70)
-mapSpawn.Parent = Workspace
+if mapSpawn.Parent ~= map then
+	mapSpawn.Parent = map
+end
 
 local lootCounter = Workspace:FindFirstChild("LootCounter") or Instance.new("Part")
 lootCounter.Name = "LootCounter"
