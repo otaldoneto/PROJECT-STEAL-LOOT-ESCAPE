@@ -11,6 +11,7 @@ local deliveryInProgress = {}
 local pendingChoices = {}
 local carryoverRewards = {}
 local pendingSales = {}
+local playerConnections = {}
 
 local function canUseZone(player, zone)
 	local character = player.Character
@@ -49,22 +50,23 @@ end
 local function finishDelivery(player, rewardType, reward, decision)
 	if decision == "Stay" then
 		player:SetAttribute("InLobby", false)
+		player:SetAttribute("Escaped", false)
 		carryoverRewards[player] = ((carryoverRewards[player] or 0) + reward) * 2
 		player:SetAttribute("CarryoverReward", carryoverRewards[player])
 		player:SetAttribute("EscapeStatus", string.format("Loot saved at 2x: %d %s next escape", carryoverRewards[player], rewardType))
-	else
-		local totalReward = reward + (carryoverRewards[player] or 0)
-		carryoverRewards[player] = 0
-		player:SetAttribute("CarryoverReward", 0)
-		player:SetAttribute("EscapeReward", totalReward)
-		pendingSales[player] = {
-			Amount = totalReward,
-			RewardType = rewardType,
-		}
-		player:SetAttribute("EscapeStatus", "Robbery complete. Return to the lobby counter to sell.")
-		moveToLobby(player)
+		return true
 	end
+	local totalReward = reward + (carryoverRewards[player] or 0)
+	carryoverRewards[player] = 0
+	player:SetAttribute("CarryoverReward", 0)
+	player:SetAttribute("EscapeReward", totalReward)
+	pendingSales[player] = {
+		Amount = totalReward,
+		RewardType = rewardType,
+	}
+	player:SetAttribute("EscapeStatus", "Robbery complete. Return to the lobby counter to sell.")
 	player:SetAttribute("Escaped", true)
+	moveToLobby(player)
 	return true
 end
 
@@ -146,9 +148,28 @@ function EscapeService.Start(inventoryService, currencyService, lootService, zon
 		pendingChoices[player] = nil
 		carryoverRewards[player] = nil
 		pendingSales[player] = nil
+		local connections = playerConnections[player]
+		if connections then
+			for _, connection in ipairs(connections) do
+				connection:Disconnect()
+			end
+			playerConnections[player] = nil
+		end
 	end)
 
+	local function setupPlayer(player)
+		playerConnections[player] = {
+			player:GetAttributeChangedSignal("Caught"):Connect(function()
+				if player:GetAttribute("Caught") == true then
+					EscapeService.ClearCarryover(player)
+				end
+			end),
+		}
+	end
+
+	Players.PlayerAdded:Connect(setupPlayer)
 	for _, player in Players:GetPlayers() do
+		setupPlayer(player)
 		player:SetAttribute("EscapeStatus", "Collect loot and reach the escape zone")
 		player:SetAttribute("EscapeChoicePending", false)
 		player:SetAttribute("CarryoverReward", 0)
@@ -159,7 +180,7 @@ end
 function EscapeService.ResetRound()
 	deliveryInProgress = {}
 	pendingChoices = {}
-	pendingSales = {}
+	carryoverRewards = {}
 	if escapeZone then
 		local prompt = escapeZone:FindFirstChildOfClass("ProximityPrompt")
 		if prompt then
@@ -169,6 +190,7 @@ function EscapeService.ResetRound()
 	for _, player in Players:GetPlayers() do
 		player:SetAttribute("EscapeStatus", "Collect loot and reach the escape zone")
 		player:SetAttribute("EscapeChoicePending", false)
+		player:SetAttribute("CarryoverReward", 0)
 		player:SetAttribute("InLobby", player:GetAttribute("InLobby") == true)
 		player:SetAttribute("LobbyStatus", "Use the lobby counter to sell escaped loot")
 	end
@@ -209,6 +231,11 @@ end
 function EscapeService.ClearPendingSale(player)
 	pendingSales[player] = nil
 	player:SetAttribute("EscapeReward", 0)
+end
+
+function EscapeService.ClearCarryover(player)
+	carryoverRewards[player] = nil
+	player:SetAttribute("CarryoverReward", 0)
 end
 
 return EscapeService

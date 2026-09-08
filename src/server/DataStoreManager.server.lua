@@ -1,6 +1,5 @@
 --!nocheck
 ---@diagnostic disable: undefined-global
 
-local DataStoreManager = require(script.Parent:WaitForChild("PlayerDataStore"))
-
-DataStoreManager.Start()
+-- DataStoreManager is started by init.server.luau (single bootstrap point).
+-- This file is kept as a placeholder; do not call Start() here.

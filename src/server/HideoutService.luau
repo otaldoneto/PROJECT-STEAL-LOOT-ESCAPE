@@ -5,6 +5,7 @@ local HideoutService = {}
 local hideoutFolder
 local hideouts = {}
 local playerHideouts = {}
+local playerConnections = {}
 
 local function getCharacter(player)
 	local character = player.Character
@@ -166,23 +167,29 @@ function HideoutService.Start(folder)
 
 	Players.PlayerRemoving:Connect(function(player)
 		releasePlayer(player, false)
+		local connections = playerConnections[player]
+		if connections then
+			for _, connection in ipairs(connections) do
+				connection:Disconnect()
+			end
+			playerConnections[player] = nil
+		end
 	end)
 
-	Players.PlayerAdded:Connect(function(player)
-		player.CharacterAdded:Connect(function()
-			releasePlayer(player, false)
-		end)
-		player.CharacterRemoving:Connect(function()
-			releasePlayer(player, false)
-		end)
-	end)
+	local function setupPlayer(player)
+		playerConnections[player] = {
+			player.CharacterAdded:Connect(function()
+				releasePlayer(player, false)
+			end),
+			player.CharacterRemoving:Connect(function()
+				releasePlayer(player, false)
+			end),
+		}
+	end
+
+	Players.PlayerAdded:Connect(setupPlayer)
 	for _, player in Players:GetPlayers() do
-		player.CharacterAdded:Connect(function()
-			releasePlayer(player, false)
-		end)
-		player.CharacterRemoving:Connect(function()
-			releasePlayer(player, false)
-		end)
+		setupPlayer(player)
 	end
 end
 

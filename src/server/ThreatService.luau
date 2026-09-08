@@ -192,6 +192,7 @@ local function attackPlayer(state, player, distance)
 		player:SetAttribute("CaughtCount", caughtCount)
 		player:SetAttribute("Caught", true)
 		player:SetAttribute("InLobby", true)
+		player:SetAttribute("EscapeChoicePending", false)
 		captureInvulnerability[player] = now + 5
 		if caughtCount == 1 then
 			InventoryService.ClearItems(player)
@@ -342,13 +343,17 @@ function ThreatService.Start(guards, cameras, inventoryService, spawnPart)
 			end
 		end
 		Workspace:SetAttribute("RoundTimeLeft", duration)
-		Workspace:SetAttribute("RoundActive", true)
-		Workspace:SetAttribute("RoundPhase", "Active")
 	end
 
 	Workspace:SetAttribute("RoundTimeLeft", 0)
 	Workspace:SetAttribute("RoundActive", false)
 	Players.PlayerAdded:Connect(initializePlayer)
+	Players.PlayerRemoving:Connect(function(player)
+		captureInvulnerability[player] = nil
+		riskUntil[player] = nil
+		riskLevels[player] = nil
+		detectionSources[player] = nil
+	end)
 	for _, player in Players:GetPlayers() do
 		initializePlayer(player)
 	end
