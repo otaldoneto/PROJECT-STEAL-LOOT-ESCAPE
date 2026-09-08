@@ -68,6 +68,13 @@ Os esconderijos ficam em `Workspace/Hideouts` e são `BasePart` com `ProximityPr
 
 O projeto não contém chaves ou credenciais: DataStoreService usa somente nomes públicos de stores, e nenhum segredo é armazenado no código. Para validar localmente, execute `rojo build -o "Steal-Loot-Escape.rbxlx"` e confira o diagnóstico do Studio. Testes de DataStore exigem uma experiência publicada e **Enable Studio Access to API Services** habilitado; sem acesso, o salvamento é desativado para evitar sobrescrever dados.
 
-Para testar persistência no Studio, publique a experiência e habilite **Game Settings > Security > Enable Studio Access to API Services**. Sem acesso ao DataStore, o jogo inicia sem dados persistidos e desativa o salvamento para evitar sobrescrever o inventário do jogador.
+## Teste Rápido
+
+1. Execute `aftman install` e depois `rojo serve`; conecte o plugin Rojo no Roblox Studio.
+2. Publique uma experiência de teste e habilite **Game Settings > Security > Enable Studio Access to API Services**.
+3. Aguarde `Active`, colete todo o loot e vá ao `EscapeZone`.
+4. Escolha `Stay` para guardar o carryover em 2x ou `Return to Lobby` para receber a recompensa e ir ao `LobbySpawn`.
+5. Para testar captura, seja pego uma vez e confirme que o loot permanece; seja pego novamente e confirme o alerta e a perda dos itens.
+6. Saia e entre novamente para confirmar a persistência de `Money`, `Points` e `SprintLevel`.
 
 For more help, check out [the Rojo documentation](https://rojo.space/docs).
