@@ -79,10 +79,8 @@
         "GoldBar": {
           "$className": "Part",
           "$attributes": {
-            "RewardType": "Money",
-            "Reward": 100,
-            "RiskLevel": 2,
-            "RiskDuration": 25
+            "ItemId": "GoldBar",
+            "Amount": 1
           },
           "$properties": {
             "Anchored": true,
@@ -127,6 +125,29 @@
             1,
             10
           ]
+        }
+      },
+      "LobbySpawn": {
+        "$className": "Part",
+        "$properties": {
+          "Anchored": true,
+          "CanCollide": false,
+          "Color": [
+            0.31373,
+            0.5098,
+            0.86275
+          ],
+          "Position": [
+            -20,
+            0.5,
+            -12
+          ],
+          "Size": [
+            8,
+            1,
+            8
+          ],
+          "Transparency": 0.5
         }
       },
       "Guards": {

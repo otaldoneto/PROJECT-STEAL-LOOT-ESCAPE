@@ -49,6 +49,10 @@ local sprintRequest = remotes:FindFirstChild("SprintRequest") or Instance.new("R
 sprintRequest.Name = "SprintRequest"
 sprintRequest.Parent = remotes
 
+local escapeDecisionRequest = remotes:FindFirstChild("EscapeDecisionRequest") or Instance.new("RemoteEvent")
+escapeDecisionRequest.Name = "EscapeDecisionRequest"
+escapeDecisionRequest.Parent = remotes
+
 local lootFolder = Workspace:FindFirstChild("Loot") or Instance.new("Folder")
 lootFolder.Name = "Loot"
 lootFolder.Parent = Workspace
@@ -75,14 +79,31 @@ local hideouts = Workspace:FindFirstChild("Hideouts") or Instance.new("Folder")
 hideouts.Name = "Hideouts"
 hideouts.Parent = Workspace
 
+local lobbySpawn = Workspace:FindFirstChild("LobbySpawn") or Instance.new("Part")
+lobbySpawn.Name = "LobbySpawn"
+lobbySpawn.Anchored = true
+lobbySpawn.CanCollide = false
+lobbySpawn.Transparency = 0.5
+lobbySpawn.Size = Vector3.new(8, 1, 8)
+lobbySpawn.Position = Vector3.new(-20, 0.5, -12)
+lobbySpawn.Color = Color3.fromRGB(80, 130, 220)
+lobbySpawn.Parent = Workspace
+
 InventoryService.Start(inventoryUpdated, inventorySnapshot)
 CurrencyService.Start()
 ProgressionService.Start(progressionUpdated, CurrencyService)
 LootService.Start(InventoryService, CurrencyService, ThreatService, lootFolder)
-EscapeService.Start(InventoryService, CurrencyService, escapeZone)
-ThreatService.Start(guards, securityCameras)
+EscapeService.Start(InventoryService, CurrencyService, LootService, escapeZone, lobbySpawn)
+ThreatService.Start(guards, securityCameras, InventoryService, lobbySpawn)
 HideoutService.Start(hideouts)
 RoundService.Start(InventoryService, LootService, EscapeService, ThreatService, HideoutService, ProgressionService)
+
+escapeDecisionRequest.OnServerEvent:Connect(function(player, decision)
+	if isRateLimited(player) then
+		return
+	end
+	EscapeService.Decide(player, decision)
+end)
 
 progressionRequest.OnServerEvent:Connect(function(player, action)
 	if isRateLimited(player) then

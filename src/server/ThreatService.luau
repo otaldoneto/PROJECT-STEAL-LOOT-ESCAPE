@@ -13,6 +13,9 @@ local detectionSources = {}
 local roundActive = false
 local riskUntil = {}
 local riskLevels = {}
+local InventoryService
+local safeSpawn
+local captureInvulnerability = {}
 
 local function getNumberAttribute(instance, name, default, minimum, maximum)
 	local value = instance:GetAttribute(name)
@@ -155,7 +158,7 @@ local function scanCameras()
 			for _, player in Players:GetPlayers() do
 				local root = getCharacterRoot(player)
 				local riskMultiplier = RiskConfig.GetVisionMultiplier(riskLevels[player] or 0)
-				if root and not player:GetAttribute("Escaped") and not player:GetAttribute("Hidden") and canSee(camera.Position, camera.CFrame.LookVector, root.Position, range * riskMultiplier, angle, camera, root) then
+				if root and not player:GetAttribute("Escaped") and not player:GetAttribute("Hidden") and not player:GetAttribute("InLobby") and canSee(camera.Position, camera.CFrame.LookVector, root.Position, range * riskMultiplier, angle, camera, root) then
 					setDetection(player, camera)
 				end
 			end
@@ -165,7 +168,7 @@ end
 
 local function attackPlayer(state, player, distance)
 	local now = os.clock()
-	if distance > state.AttackDistance or now - state.LastAttack < state.AttackCooldown then
+	if distance > state.AttackDistance or now - state.LastAttack < state.AttackCooldown or now < (captureInvulnerability[player] or 0) then
 		return
 	end
 
@@ -173,8 +176,26 @@ local function attackPlayer(state, player, distance)
 	local humanoid = root and root.Parent:FindFirstChildOfClass("Humanoid")
 	if humanoid then
 		state.LastAttack = now
-		humanoid:TakeDamage(state.Damage)
+		humanoid.Health = math.max(1, humanoid.Health - state.Damage)
+		local caughtCount = (player:GetAttribute("CaughtCount") or 0) + 1
+		player:SetAttribute("CaughtCount", caughtCount)
 		player:SetAttribute("Caught", true)
+		captureInvulnerability[player] = now + 5
+		if caughtCount == 1 then
+			humanoid.Health = humanoid.MaxHealth
+			if safeSpawn and player.Character then
+				player.Character:PivotTo(safeSpawn.CFrame + Vector3.new(0, 3, 0))
+			end
+			player:SetAttribute("CaptureStatus", "CAUGHT! You have one more chance. Your loot is safe for now.")
+		else
+			InventoryService.ClearItems(player)
+			player:SetAttribute("ItemsLost", true)
+			player:SetAttribute("CaptureStatus", "CAUGHT AGAIN! All loot from this round was lost.")
+			humanoid.Health = humanoid.MaxHealth
+			if safeSpawn and player.Character then
+				player.Character:PivotTo(safeSpawn.CFrame + Vector3.new(0, 3, 0))
+			end
+		end
 	end
 end
 
@@ -189,7 +210,7 @@ local function updateGuard(guard, state, deltaTime)
 	local targetDistance = math.huge
 	for _, player in Players:GetPlayers() do
 		local playerRoot = getCharacterRoot(player)
-		if playerRoot and not player:GetAttribute("Escaped") and not player:GetAttribute("Hidden") then
+		if playerRoot and not player:GetAttribute("Escaped") and not player:GetAttribute("Hidden") and not player:GetAttribute("InLobby") then
 			local riskMultiplier = RiskConfig.GetVisionMultiplier(riskLevels[player] or 0)
 			local distance = (playerRoot.Position - root.Position).Magnitude
 			if distance < targetDistance and canSee(root.Position, root.CFrame.LookVector, playerRoot.Position, state.VisionRange * riskMultiplier, state.VisionAngle, guard, playerRoot) then
@@ -229,13 +250,19 @@ local function initializePlayer(player)
 	player:SetAttribute("Hideout", "")
 	player:SetAttribute("HideoutWasSprinting", false)
 	player:SetAttribute("LootRisk", "Low")
+	player:SetAttribute("EscapeStatus", "Collect loot and reach the escape zone")
+	player:SetAttribute("CaughtCount", 0)
+	player:SetAttribute("ItemsLost", false)
+	player:SetAttribute("CaptureStatus", "")
 end
 
-function ThreatService.Start(guards, cameras)
+function ThreatService.Start(guards, cameras, inventoryService, spawnPart)
 	assert(guards and guards:IsA("Folder"), "Guards must be a Folder")
 	assert(cameras and cameras:IsA("Folder"), "SecurityCameras must be a Folder")
 	guardFolder = guards
 	cameraFolder = cameras
+	InventoryService = inventoryService
+	safeSpawn = spawnPart
 
 	if #guardFolder:GetChildren() == 0 then
 		createDefaultGuard()
@@ -269,10 +296,14 @@ function ThreatService.Start(guards, cameras)
 				player:SetAttribute("Detected", false)
 				player:SetAttribute("ThreatLevel", "Safe")
 				player:SetAttribute("LootRisk", "Low")
+				player:SetAttribute("CaughtCount", 0)
+				player:SetAttribute("ItemsLost", false)
+				player:SetAttribute("CaptureStatus", "")
 			end
 			detectionSources = {}
 			riskUntil = {}
 			riskLevels = {}
+			captureInvulnerability = {}
 		end
 	end
 

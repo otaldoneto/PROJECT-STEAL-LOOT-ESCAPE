@@ -4,8 +4,12 @@ local Workspace = game:GetService("Workspace")
 local EscapeService = {}
 local InventoryService
 local CurrencyService
+local LootService
 local escapeZone
-local escapedPlayers = {}
+local lobbySpawn
+local deliveryInProgress = {}
+local pendingChoices = {}
+local carryoverRewards = {}
 
 local function canUseZone(player, zone)
 	local character = player.Character
@@ -14,7 +18,48 @@ local function canUseZone(player, zone)
 	if not root or not humanoid or humanoid.Health <= 0 then
 		return false
 	end
-	return (root.Position - zone.Position).Magnitude <= 12
+	local localPosition = zone.CFrame:PointToObjectSpace(root.Position)
+	local horizontalPadding = 3
+	return math.abs(localPosition.X) <= zone.Size.X / 2 + horizontalPadding
+		and math.abs(localPosition.Z) <= zone.Size.Z / 2 + horizontalPadding
+		and math.abs(localPosition.Y) <= 8
+end
+
+local function moveToLobby(player)
+	local character = player.Character
+	if character and lobbySpawn then
+		character:PivotTo(lobbySpawn.CFrame + Vector3.new(0, 3, 0))
+	end
+	player:SetAttribute("InLobby", true)
+end
+
+local function clearChoice(player)
+	pendingChoices[player] = nil
+	player:SetAttribute("EscapeChoicePending", false)
+end
+
+local function finishDelivery(player, rewardType, reward, decision)
+	if decision == "Stay" then
+		player:SetAttribute("InLobby", false)
+		carryoverRewards[player] = ((carryoverRewards[player] or 0) + reward) * 2
+		player:SetAttribute("CarryoverReward", carryoverRewards[player])
+		player:SetAttribute("EscapeStatus", string.format("Loot saved at 2x: %d %s next escape", carryoverRewards[player], rewardType))
+	else
+		local totalReward = reward + (carryoverRewards[player] or 0)
+		if not CurrencyService.CanAdd(player, rewardType, totalReward) then
+			return false, "Currency is not ready or full"
+		end
+		if not CurrencyService.Add(player, rewardType, totalReward) then
+			return false, "Could not deliver loot"
+		end
+		carryoverRewards[player] = 0
+		player:SetAttribute("CarryoverReward", 0)
+		player:SetAttribute("EscapeReward", totalReward)
+		player:SetAttribute("EscapeStatus", string.format("Escaped: +%d %s", totalReward, rewardType))
+		moveToLobby(player)
+	end
+	player:SetAttribute("Escaped", true)
+	return true
 end
 
 local function setupPrompt()
@@ -27,52 +72,120 @@ local function setupPrompt()
 	prompt.ActionText = "Escape"
 	prompt.ObjectText = "Escape Zone"
 	prompt.HoldDuration = 1
-	prompt.MaxActivationDistance = 10
-	prompt.RequiresLineOfSight = true
+	prompt.MaxActivationDistance = 14
+	prompt.RequiresLineOfSight = false
 	prompt.Parent = escapeZone
 
 	prompt.Triggered:Connect(function(player)
-		if escapedPlayers[player] or player.Parent ~= Players or not canUseZone(player, escapeZone) then
+		if deliveryInProgress[player] or player.Parent ~= Players or not canUseZone(player, escapeZone) then
+			player:SetAttribute("EscapeStatus", "Move closer to the escape zone")
 			return
 		end
+		deliveryInProgress[player] = true
 
 		local reward = InventoryService.GetDepositValue(player)
-		if Workspace:GetAttribute("RoundPhase") ~= "Active" or reward < 1 or not CurrencyService.CanAdd(player, rewardType, reward) then
+		if Workspace:GetAttribute("RoundPhase") ~= "Active" then
+			player:SetAttribute("EscapeStatus", "Escape is available during Active only")
+			deliveryInProgress[player] = nil
+			return
+		end
+		local carryover = carryoverRewards[player] or 0
+		if reward < 1 and carryover < 1 then
+			player:SetAttribute("EscapeStatus", "Collect loot before escaping")
+			deliveryInProgress[player] = nil
+			return
+		end
+		local _, _, allLootCollected = LootService.GetRoundStatus()
+		if allLootCollected and reward > 0 then
+			pendingChoices[player] = {
+				Reward = reward,
+				RewardType = rewardType,
+			}
+			player:SetAttribute("EscapeChoicePending", true)
+			player:SetAttribute("EscapeStatus", "Choose: Stay for 2x loot or return to Lobby")
+			deliveryInProgress[player] = nil
+			return
+		end
+		if not CurrencyService.CanAdd(player, rewardType, reward + carryover) then
+			player:SetAttribute("EscapeStatus", "Currency is not ready or full")
+			deliveryInProgress[player] = nil
 			return
 		end
 
-		if not CurrencyService.Add(player, rewardType, reward) then
-			return
-		end
 		if not InventoryService.ClearItems(player) then
+			player:SetAttribute("EscapeStatus", "Inventory is not ready")
+			deliveryInProgress[player] = nil
+			return
+		end
+		if not finishDelivery(player, rewardType, reward, "Lobby") then
+			player:SetAttribute("EscapeStatus", "Could not deliver loot")
+			deliveryInProgress[player] = nil
 			return
 		end
 
-		escapedPlayers[player] = true
-		player:SetAttribute("Escaped", true)
-		player:SetAttribute("EscapeReward", reward)
+		deliveryInProgress[player] = nil
 	end)
 end
 
-function EscapeService.Start(inventoryService, currencyService, zone)
+function EscapeService.Start(inventoryService, currencyService, lootService, zone, lobby)
 	InventoryService = inventoryService
 	CurrencyService = currencyService
+	LootService = lootService
 	escapeZone = zone
+	lobbySpawn = lobby
 	setupPrompt()
 
 	Players.PlayerRemoving:Connect(function(player)
-		escapedPlayers[player] = nil
+		deliveryInProgress[player] = nil
+		pendingChoices[player] = nil
+		carryoverRewards[player] = nil
 	end)
+
+	for _, player in Players:GetPlayers() do
+		player:SetAttribute("EscapeStatus", "Collect loot and reach the escape zone")
+		player:SetAttribute("EscapeChoicePending", false)
+		player:SetAttribute("CarryoverReward", 0)
+	end
 end
 
 function EscapeService.ResetRound()
-	escapedPlayers = {}
+	deliveryInProgress = {}
+	pendingChoices = {}
 	if escapeZone then
 		local prompt = escapeZone:FindFirstChildOfClass("ProximityPrompt")
 		if prompt then
 			prompt.Enabled = true
 		end
 	end
+	for _, player in Players:GetPlayers() do
+		player:SetAttribute("EscapeStatus", "Collect loot and reach the escape zone")
+		player:SetAttribute("EscapeChoicePending", false)
+		player:SetAttribute("InLobby", player:GetAttribute("InLobby") == true)
+	end
+end
+
+function EscapeService.Decide(player, decision)
+	if typeof(player) ~= "Instance" or not player:IsA("Player") or (decision ~= "Stay" and decision ~= "Lobby") then
+		return false
+	end
+	local pendingChoice = pendingChoices[player]
+	if not pendingChoice or player.Parent ~= Players or not canUseZone(player, escapeZone) then
+		return false
+	end
+	if decision == "Lobby" and not CurrencyService.CanAdd(player, pendingChoice.RewardType, pendingChoice.Reward + (carryoverRewards[player] or 0)) then
+		player:SetAttribute("EscapeStatus", "Currency is not ready or full")
+		return false
+	end
+	if not InventoryService.ClearItems(player) then
+		return false
+	end
+	clearChoice(player)
+	local success, message = finishDelivery(player, pendingChoice.RewardType, pendingChoice.Reward, decision)
+	if not success then
+		player:SetAttribute("EscapeStatus", message)
+		return false
+	end
+	return true
 end
 
 return EscapeService

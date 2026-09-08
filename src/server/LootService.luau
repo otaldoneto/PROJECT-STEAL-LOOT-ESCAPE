@@ -1,4 +1,5 @@
 local Players = game:GetService("Players")
+local Workspace = game:GetService("Workspace")
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local InventoryConfig = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("InventoryConfig"))
@@ -68,7 +69,7 @@ local function setupLootPart(lootPart)
 
 	prompt.Triggered:Connect(function(player)
 		local lootState = activeLoot[lootPart]
-		if not lootState or lootState.Collected or lootState.Collecting or Workspace:GetAttribute("RoundPhase") ~= "Active" or player.Parent ~= Players or not lootPart:IsDescendantOf(lootContainer) or not canCollect(player, lootPart) then
+		if not lootState or lootState.Collected or lootState.Collecting or Workspace:GetAttribute("RoundPhase") ~= "Active" or player.Parent ~= Players or player:GetAttribute("InLobby") or not lootPart:IsDescendantOf(lootContainer) or not canCollect(player, lootPart) then
 			return
 		end
 		lootState.Collecting = true
@@ -81,6 +82,9 @@ local function setupLootPart(lootPart)
 		end
 		if added then
 			ThreatService.MarkRisk(player, riskLevel, riskDuration)
+			player:SetAttribute("Escaped", false)
+			player:SetAttribute("EscapeReward", 0)
+			player:SetAttribute("EscapeStatus", "Loot collected. Reach the escape zone")
 			lootState.Collected = true
 			activeLoot[lootPart] = nil
 			prompt.Enabled = false
@@ -115,6 +119,20 @@ function LootService.ResetRound()
 			lootPart.CanCollide = properties.CanCollide
 		end
 	end
+end
+
+function LootService.GetRoundStatus()
+	local total = 0
+	local collected = 0
+	for lootPart, state in pairs(lootStates) do
+		if lootPart:IsDescendantOf(lootContainer) then
+			total += 1
+			if state.Collected then
+				collected += 1
+			end
+		end
+	end
+	return total, collected, total > 0 and collected >= total
 end
 
 return LootService

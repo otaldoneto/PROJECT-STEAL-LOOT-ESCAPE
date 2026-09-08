@@ -32,7 +32,7 @@ O servidor é a autoridade: peso, slots, stacks, distância da coleta, recompens
 
 ## Zona de Escape
 
-A área `Workspace/EscapeZone` usa `ProximityPrompt`. O jogador precisa estar vivo, próximo da zona e carregando loot com `EscapeValue`. Ao escapar, o valor dos itens é convertido na moeda definida pelo atributo `RewardType` (`Money` ou `Points`), o inventário é descarregado e os atributos `Escaped` e `EscapeReward` são atualizados. Cada jogador pode escapar uma vez por sessão.
+A área `Workspace/EscapeZone` usa `ProximityPrompt` e valida uma região retangular ao redor da peça no servidor. O jogador precisa estar vivo, dentro da área, na fase `Active` e carregando loot com `EscapeValue`. Ao escapar, o valor dos itens é convertido na moeda definida pelo atributo `RewardType` (`Money` ou `Points`), o inventário é descarregado e os atributos `Escaped` e `EscapeReward` são atualizados. O jogador pode fazer várias entregas na mesma rodada, desde que colete novo loot entre elas. O HUD mostra `EscapeStatus` quando a entrega é recusada ou concluída.
 
 Os valores de descarregamento ficam em `src/shared/InventoryConfig.luau`, no campo `EscapeValue` de cada item.
 
@@ -49,6 +49,10 @@ Cada loot possui `RiskLevel` de `0` a `2` e `RiskDuration` em segundos. `0` é b
 O timer é controlado pelo `RoundService`: a fase `Active` dura 180 segundos e `TimerWarning` fica ativo nos últimos 30 segundos. O HUD exibe a fase, o tempo, o alerta e o risco atual; esses dados são somente leitura no cliente.
 
 O ciclo de partida é controlado apenas pelo servidor: `Intermission` de 10 segundos, `Active` de 3 minutos e `Results` de 8 segundos. No início de uma rodada ativa, o loot do mapa é restaurado e o inventário carregado da rodada anterior é descartado; o jogador precisa coletar novamente e escapar. O cliente apenas exibe `RoundPhase`, `RoundTimeLeft` e os estados replicados, sem poder iniciar, acelerar ou encerrar a rodada.
+
+Quando todo o loot válido da rodada foi coletado e o jogador chega ao escape, o servidor oferece duas opções. `Stay` mantém o jogador no jogo e transforma o loot entregue em carryover com valor dobrado para a próxima entrega. `Return to Lobby` paga a recompensa acumulada e teleporta o jogador para `Workspace/LobbySpawn`; jogadores no lobby não coletam loot nem são detectados. A decisão é validada por RemoteEvent no servidor.
+
+Ao ser capturado pela primeira vez, o jogador é restaurado em um ponto seguro e mantém o loot. A segunda captura limpa o inventário da rodada, define `ItemsLost` e exibe um alerta no HUD. Há uma invulnerabilidade curta entre capturas para impedir dano repetido instantâneo.
 
 ## Ameaças
 

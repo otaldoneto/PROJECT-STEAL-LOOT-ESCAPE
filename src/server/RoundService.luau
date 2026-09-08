@@ -37,6 +37,11 @@ local function resetPlayers()
 		player:SetAttribute("Hidden", false)
 		player:SetAttribute("Hideout", "")
 		player:SetAttribute("HideoutWasSprinting", false)
+		player:SetAttribute("EscapeStatus", "Collect loot and reach the escape zone")
+		player:SetAttribute("EscapeChoicePending", false)
+		player:SetAttribute("CaughtCount", 0)
+		player:SetAttribute("ItemsLost", false)
+		player:SetAttribute("CaptureStatus", "")
 	end
 end
 

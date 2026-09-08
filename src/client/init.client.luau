@@ -10,6 +10,7 @@ local inventorySnapshot = remotes:WaitForChild("InventorySnapshot")
 local progressionUpdated = remotes:WaitForChild("ProgressionUpdated")
 local progressionRequest = remotes:WaitForChild("ProgressionRequest")
 local sprintRequest = remotes:WaitForChild("SprintRequest")
+local escapeDecisionRequest = remotes:WaitForChild("EscapeDecisionRequest")
 local inventoryConfig = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("InventoryConfig"))
 
 local screenGui = Instance.new("ScreenGui")
@@ -60,6 +61,69 @@ threatStatus.TextColor3 = Color3.fromRGB(235, 235, 235)
 threatStatus.TextSize = 18
 threatStatus.TextXAlignment = Enum.TextXAlignment.Center
 threatStatus.Parent = screenGui
+
+local escapeStatus = Instance.new("TextLabel")
+escapeStatus.Name = "EscapeStatus"
+escapeStatus.AnchorPoint = Vector2.new(0.5, 1)
+escapeStatus.Position = UDim2.new(0.5, 0, 1, -20)
+escapeStatus.Size = UDim2.fromOffset(520, 32)
+escapeStatus.BackgroundColor3 = Color3.fromRGB(25, 25, 32)
+escapeStatus.BackgroundTransparency = 0.15
+escapeStatus.TextColor3 = Color3.fromRGB(235, 235, 235)
+escapeStatus.TextSize = 17
+escapeStatus.TextWrapped = true
+escapeStatus.TextXAlignment = Enum.TextXAlignment.Center
+escapeStatus.Parent = screenGui
+
+local decisionPanel = Instance.new("Frame")
+decisionPanel.Name = "EscapeDecisionPanel"
+decisionPanel.AnchorPoint = Vector2.new(0.5, 0.5)
+decisionPanel.Position = UDim2.fromScale(0.5, 0.5)
+decisionPanel.Size = UDim2.fromOffset(430, 220)
+decisionPanel.BackgroundColor3 = Color3.fromRGB(25, 25, 32)
+decisionPanel.Visible = false
+decisionPanel.Parent = screenGui
+
+local decisionTitle = Instance.new("TextLabel")
+decisionTitle.Size = UDim2.new(1, -24, 0, 80)
+decisionTitle.Position = UDim2.fromOffset(12, 12)
+decisionTitle.BackgroundTransparency = 1
+decisionTitle.TextColor3 = Color3.new(1, 1, 1)
+decisionTitle.TextSize = 20
+decisionTitle.TextWrapped = true
+decisionTitle.Text = "All loot collected! Stay for the next round and save it at 2x, or return to the lobby?"
+decisionTitle.Parent = decisionPanel
+
+local stayButton = Instance.new("TextButton")
+stayButton.Size = UDim2.new(0.46, 0, 0, 50)
+stayButton.Position = UDim2.new(0.03, 0, 1, -65)
+stayButton.BackgroundColor3 = Color3.fromRGB(190, 130, 45)
+stayButton.TextColor3 = Color3.new(1, 1, 1)
+stayButton.TextSize = 17
+stayButton.Text = "Stay  |  2x"
+stayButton.Parent = decisionPanel
+
+local lobbyButton = Instance.new("TextButton")
+lobbyButton.Size = UDim2.new(0.46, 0, 0, 50)
+lobbyButton.Position = UDim2.new(0.51, 0, 1, -65)
+lobbyButton.BackgroundColor3 = Color3.fromRGB(70, 130, 200)
+lobbyButton.TextColor3 = Color3.new(1, 1, 1)
+lobbyButton.TextSize = 17
+lobbyButton.Text = "Return to Lobby"
+lobbyButton.Parent = decisionPanel
+
+local captureAlert = Instance.new("TextLabel")
+captureAlert.Name = "CaptureAlert"
+captureAlert.AnchorPoint = Vector2.new(0.5, 0)
+captureAlert.Position = UDim2.new(0.5, 0, 0, 64)
+captureAlert.Size = UDim2.fromOffset(560, 48)
+captureAlert.BackgroundColor3 = Color3.fromRGB(135, 35, 35)
+captureAlert.BackgroundTransparency = 0.1
+captureAlert.TextColor3 = Color3.new(1, 1, 1)
+captureAlert.TextSize = 18
+captureAlert.TextWrapped = true
+captureAlert.Visible = false
+captureAlert.Parent = screenGui
 
 local shopPanel = Instance.new("Frame")
 shopPanel.Name = "ShopPanel"
@@ -171,6 +235,34 @@ workspace:GetAttributeChangedSignal("TimerWarning"):Connect(renderThreatStatus)
 player:GetAttributeChangedSignal("ThreatLevel"):Connect(renderThreatStatus)
 player:GetAttributeChangedSignal("Hidden"):Connect(renderThreatStatus)
 player:GetAttributeChangedSignal("LootRisk"):Connect(renderThreatStatus)
+local function renderEscapeStatus()
+	escapeStatus.Text = player:GetAttribute("EscapeStatus") or "Collect loot and reach the escape zone"
+	escapeStatus.TextColor3 = player:GetAttribute("Escaped") and Color3.fromRGB(130, 220, 170) or Color3.fromRGB(235, 235, 235)
+	decisionPanel.Visible = player:GetAttribute("EscapeChoicePending") == true
+end
+
+player:GetAttributeChangedSignal("EscapeStatus"):Connect(renderEscapeStatus)
+player:GetAttributeChangedSignal("Escaped"):Connect(renderEscapeStatus)
+renderEscapeStatus()
+
+stayButton.Activated:Connect(function()
+	decisionPanel.Visible = false
+	escapeDecisionRequest:FireServer("Stay")
+end)
+
+lobbyButton.Activated:Connect(function()
+	decisionPanel.Visible = false
+	escapeDecisionRequest:FireServer("Lobby")
+end)
+
+local function renderCaptureAlert()
+	local status = player:GetAttribute("CaptureStatus") or ""
+	captureAlert.Text = status
+	captureAlert.Visible = status ~= ""
+end
+
+player:GetAttributeChangedSignal("CaptureStatus"):Connect(renderCaptureAlert)
+renderCaptureAlert()
 renderThreatStatus()
 player:GetAttributeChangedSignal("SprintLevel"):Connect(renderProgression)
 player:GetAttributeChangedSignal("SprintSpeed"):Connect(renderProgression)
