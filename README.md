@@ -16,11 +16,25 @@ rojo serve
 
 ## Inventário
 
-O jogador pode abrir a mochila com `B`. Os itens de teste ficam na pasta `Workspace/Loot` e são coletados por `ProximityPrompt`.
+O jogador pode abrir a mochila com `B`. Os objetos de teste ficam na pasta `Workspace/Loot` e são coletados por `ProximityPrompt`.
 
-As regras ficam em `src/shared/InventoryConfig.luau`. Para adicionar loot ao mapa, crie uma `BasePart` dentro de `Workspace/Loot` com os atributos `ItemId` e `Amount`. O item precisa existir no catálogo e a quantidade não pode ultrapassar `MaxStack`.
+As regras ficam em `src/shared/InventoryConfig.luau`. Para adicionar loot de inventário ao mapa, crie uma `BasePart` dentro de `Workspace/Loot` com os atributos `ItemId` e `Amount`. O item precisa existir no catálogo e a quantidade não pode ultrapassar `MaxStack`.
 
-O servidor é a autoridade: peso, slots, stacks, distância da coleta e remoção são validados no servidor. O inventário é salvo no DataStore `StealLootEscapeInventory_v1`.
+Para loot de recompensa, use os atributos `RewardType` (`Money` ou `Points`) e `Reward` (inteiro positivo). Cada objeto só pode ser coletado uma vez por sessão, e o servidor valida distância, personagem vivo, tipo e valor antes de conceder a recompensa. `Money` e `Points` são publicados como atributos do jogador e em `leaderstats`, além de serem salvos no DataStore `StealLootEscapeCurrency_v1`.
+
+O servidor é a autoridade: peso, slots, stacks, distância da coleta, recompensas e remoção são validados no servidor. O inventário é salvo no DataStore `StealLootEscapeInventory_v1`.
+
+## Zona de Escape
+
+A área `Workspace/EscapeZone` usa `ProximityPrompt`. O jogador precisa estar vivo, próximo da zona e carregando loot com `EscapeValue`. Ao escapar, o valor dos itens é convertido na moeda definida pelo atributo `RewardType` (`Money` ou `Points`), o inventário é descarregado e os atributos `Escaped` e `EscapeReward` são atualizados. Cada jogador pode escapar uma vez por sessão.
+
+Os valores de descarregamento ficam em `src/shared/InventoryConfig.luau`, no campo `EscapeValue` de cada item.
+
+## Ameaças
+
+O servidor cria uma guarda e uma câmera de demonstração nas pastas `Workspace/Guards` e `Workspace/SecurityCameras` quando elas estão vazias. Guardas usam visão por cone e raycast, patrulham, perseguem jogadores detectados e aplicam dano com cooldown. Câmeras são configuradas por `VisionRange` e `VisionAngle`. O timer global dura 3 minutos e fica disponível em `Workspace.RoundTimeLeft`; ao acabar, jogadores que não escaparam recebem `TimeExpired`.
+
+Guardas podem ser configuradas como `Model` com `PrimaryPart` ou `HumanoidRootPart`. Seus atributos opcionais são `VisionRange`, `VisionAngle`, `PatrolRadius`, `Speed`, `AttackDistance`, `Damage` e `AttackCooldown`. A detecção é calculada no servidor e exposta ao cliente apenas pelos atributos `Detected` e `ThreatLevel`.
 
 Para testar persistência no Studio, publique a experiência e habilite **Game Settings > Security > Enable Studio Access to API Services**. Sem acesso ao DataStore, o jogo inicia sem dados persistidos e desativa o salvamento para evitar sobrescrever o inventário do jogador.
 

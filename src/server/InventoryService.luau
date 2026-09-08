@@ -211,6 +211,35 @@ function InventoryService.GetSnapshot(player)
 	return snapshot
 end
 
+function InventoryService.GetDepositValue(player)
+	local inventory = inventories[player]
+	if not inventory or not loaded[player] then
+		return 0
+	end
+
+	local totalValue = 0
+	for itemId, amount in pairs(inventory.Items) do
+		local item = InventoryConfig.Items[itemId]
+		if item and typeof(item.EscapeValue) == "number" then
+			totalValue += item.EscapeValue * amount
+		end
+	end
+	return totalValue
+end
+
+function InventoryService.ClearItems(player)
+	local inventory = inventories[player]
+	if not inventory or not loaded[player] then
+		return false
+	end
+
+	table.clear(inventory.Items)
+	inventory.SlotCount = 0
+	inventory.Weight = 0
+	publish(player)
+	return true
+end
+
 function InventoryService.Start(inventoryUpdatedRemote, snapshotRemote)
 	assert(inventoryUpdatedRemote and inventoryUpdatedRemote:IsA("RemoteEvent"), "InventoryUpdated must be a RemoteEvent")
 	assert(snapshotRemote and snapshotRemote:IsA("RemoteFunction"), "InventorySnapshot must be a RemoteFunction")

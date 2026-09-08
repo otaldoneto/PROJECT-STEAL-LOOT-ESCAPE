@@ -46,6 +46,18 @@ contents.TextXAlignment = Enum.TextXAlignment.Left
 contents.TextYAlignment = Enum.TextYAlignment.Top
 contents.Parent = panel
 
+local threatStatus = Instance.new("TextLabel")
+threatStatus.Name = "ThreatStatus"
+threatStatus.AnchorPoint = Vector2.new(1, 0)
+threatStatus.Position = UDim2.new(1, -20, 0, 20)
+threatStatus.Size = UDim2.fromOffset(280, 34)
+threatStatus.BackgroundColor3 = Color3.fromRGB(25, 25, 32)
+threatStatus.BackgroundTransparency = 0.15
+threatStatus.TextColor3 = Color3.fromRGB(235, 235, 235)
+threatStatus.TextSize = 18
+threatStatus.TextXAlignment = Enum.TextXAlignment.Center
+threatStatus.Parent = screenGui
+
 local function render(snapshot)
 	local lines = {}
 	for _, entry in snapshot do
@@ -59,6 +71,20 @@ local function render(snapshot)
 end
 
 inventoryUpdated.OnClientEvent:Connect(render)
+
+local function renderThreatStatus()
+	local timeLeft = workspace:GetAttribute("RoundTimeLeft") or 0
+	local minutes = math.floor(timeLeft / 60)
+	local seconds = timeLeft % 60
+	local threatLevel = workspace:GetAttribute("RoundActive") == false and "TIME EXPIRED" or (player:GetAttribute("ThreatLevel") or "Safe")
+	threatStatus.Text = string.format("TIME %02d:%02d  |  ALERT: %s", minutes, seconds, string.upper(threatLevel))
+	threatStatus.TextColor3 = threatLevel == "High" and Color3.fromRGB(255, 110, 100) or Color3.fromRGB(235, 235, 235)
+end
+
+workspace:GetAttributeChangedSignal("RoundTimeLeft"):Connect(renderThreatStatus)
+workspace:GetAttributeChangedSignal("RoundActive"):Connect(renderThreatStatus)
+player:GetAttributeChangedSignal("ThreatLevel"):Connect(renderThreatStatus)
+renderThreatStatus()
 
 local initialSnapshot = inventorySnapshot:InvokeServer()
 if typeof(initialSnapshot) == "table" then

@@ -3,6 +3,9 @@ local Workspace = game:GetService("Workspace")
 
 local InventoryService = require(script:WaitForChild("InventoryService"))
 local LootService = require(script:WaitForChild("LootService"))
+local CurrencyService = require(script:WaitForChild("CurrencyService"))
+local EscapeService = require(script:WaitForChild("EscapeService"))
+local ThreatService = require(script:WaitForChild("ThreatService"))
 local requestTimestamps = {}
 
 local function isRateLimited(player)
@@ -35,8 +38,29 @@ local lootFolder = Workspace:FindFirstChild("Loot") or Instance.new("Folder")
 lootFolder.Name = "Loot"
 lootFolder.Parent = Workspace
 
+local escapeZone = Workspace:FindFirstChild("EscapeZone") or Instance.new("Part")
+escapeZone.Name = "EscapeZone"
+escapeZone.Anchored = true
+escapeZone.Size = Vector3.new(10, 1, 10)
+escapeZone.Position = Vector3.new(0, 0.5, -12)
+escapeZone.Color = Color3.fromRGB(70, 190, 120)
+escapeZone.Material = Enum.Material.Neon
+escapeZone:SetAttribute("RewardType", "Money")
+escapeZone.Parent = Workspace
+
+local guards = Workspace:FindFirstChild("Guards") or Instance.new("Folder")
+guards.Name = "Guards"
+guards.Parent = Workspace
+
+local securityCameras = Workspace:FindFirstChild("SecurityCameras") or Instance.new("Folder")
+securityCameras.Name = "SecurityCameras"
+securityCameras.Parent = Workspace
+
 InventoryService.Start(inventoryUpdated, inventorySnapshot)
-LootService.Start(InventoryService, lootFolder)
+CurrencyService.Start()
+LootService.Start(InventoryService, CurrencyService, lootFolder)
+EscapeService.Start(InventoryService, CurrencyService, escapeZone)
+ThreatService.Start(guards, securityCameras)
 
 inventoryRequest.OnServerEvent:Connect(function(player, action, itemId, amount)
 	if isRateLimited(player) then

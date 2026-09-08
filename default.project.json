@@ -79,8 +79,8 @@
         "GoldBar": {
           "$className": "Part",
           "$attributes": {
-            "ItemId": "GoldBar",
-            "Amount": 1
+            "RewardType": "Money",
+            "Reward": 100
           },
           "$properties": {
             "Anchored": true,
@@ -101,6 +101,37 @@
             ]
           }
         }
+      },
+      "EscapeZone": {
+        "$className": "Part",
+        "$attributes": {
+          "RewardType": "Money"
+        },
+        "$properties": {
+          "Anchored": true,
+          "Color": [
+            0.27451,
+            0.7451,
+            0.47059
+          ],
+          "Material": "Neon",
+          "Position": [
+            0,
+            0.5,
+            -12
+          ],
+          "Size": [
+            10,
+            1,
+            10
+          ]
+        }
+      },
+      "Guards": {
+        "$className": "Folder"
+      },
+      "SecurityCameras": {
+        "$className": "Folder"
       }
     },
     "Lighting": {
