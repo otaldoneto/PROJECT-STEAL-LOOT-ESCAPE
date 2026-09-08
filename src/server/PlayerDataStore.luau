@@ -24,6 +24,10 @@ local AUTOSAVE_INTERVAL = 5 * 60
 
 local function getKey(player) return "Player_" .. player.UserId end
 
+local function isPlayerActive(player)
+	return player.Parent == Players
+end
+
 local function isInteger(value, minimum, maximum)
 	return typeof(value) == "number" and value >= minimum and value <= maximum and value % 1 == 0
 end
@@ -91,6 +95,9 @@ local function migrate(player)
 end
 
 local function publish(player, data)
+	if not isPlayerActive(player) then
+		return false
+	end
 	publishing[player] = true
 	local leaderstats = player:FindFirstChild("leaderstats")
 	if not leaderstats then
@@ -129,14 +136,16 @@ local function publish(player, data)
 	publishing[player] = nil
 	player:SetAttribute("DataStoreReady", true)
 	player:SetAttribute("PersistentDataReady", true)
+	return true
 end
 
 local function loadPlayer(player)
 	local success, data = tryGet(playerStore, getKey(player))
-	if player.Parent ~= Players then
+	if not isPlayerActive(player) then
 		return
 	end
 	if not success then
+		if not isPlayerActive(player) then return end
 		player:SetAttribute("DataStoreReady", false)
 		player:SetAttribute("PersistentDataReady", false)
 		warn(string.format("Could not load canonical data for %s; saving is disabled", player.Name))
@@ -146,6 +155,7 @@ local function loadPlayer(player)
 	if data == nil then
 		local migrationSafe
 		loadedData, migrationSafe = migrate(player)
+		if not isPlayerActive(player) then return end
 		if not migrationSafe then
 			player:SetAttribute("DataStoreReady", false)
 			player:SetAttribute("PersistentDataReady", false)
@@ -155,11 +165,13 @@ local function loadPlayer(player)
 	else
 		loadedData = sanitize(data)
 	end
-	if player.Parent ~= Players then
+	if not isPlayerActive(player) then
 		return
 	end
 	sessions[player] = loadedData
-	publish(player, loadedData)
+	if not publish(player, loadedData) then
+		sessions[player] = nil
+	end
 end
 
 local function savePlayer(player)
