@@ -54,6 +54,10 @@ local escapeDecisionRequest = remotes:FindFirstChild("EscapeDecisionRequest") or
 escapeDecisionRequest.Name = "EscapeDecisionRequest"
 escapeDecisionRequest.Parent = remotes
 
+local lockpickRemote = remotes:FindFirstChild("LockpickRemote") or Instance.new("RemoteEvent")
+lockpickRemote.Name = "LockpickRemote"
+lockpickRemote.Parent = remotes
+
 local lootFolder = Workspace:FindFirstChild("Loot") or Instance.new("Folder")
 lootFolder.Name = "Loot"
 lootFolder.Parent = Workspace
@@ -149,6 +153,10 @@ leaderboardBoard.Size = Vector3.new(12, 8, 1)
 leaderboardBoard.Position = Vector3.new(-30, 4, -12)
 leaderboardBoard.Color = Color3.fromRGB(30, 35, 50)
 leaderboardBoard.Parent = Workspace
+
+local vaults = Workspace:FindFirstChild("Vaults") or Instance.new("Folder")
+vaults.Name = "Vaults"
+vaults.Parent = Workspace
 
 InventoryService.Start(inventoryUpdated, inventorySnapshot)
 CurrencyService.Start()

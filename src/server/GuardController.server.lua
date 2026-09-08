@@ -13,12 +13,13 @@ local guardFolder = Workspace:WaitForChild("Guards")
 local waypointFolder = Workspace:WaitForChild("GuardWaypoints")
 local controllers = {}
 
-local MAX_VISION_DISTANCE = 30
+local MAX_VISION_DISTANCE = 35
 local FRONT_VISION_ANGLE = 120
 local LOST_SIGHT_GRACE = 5
 local UPDATE_INTERVAL = 0.25
 local PATROL_SPEED = 7
 local CHASE_SPEED = 18
+local ALERT_SOUND_ID = "rbxassetid://9118823101"
 
 local function getRootAndHumanoid(guard)
 	local root = guard:FindFirstChild("HumanoidRootPart")
@@ -114,6 +115,30 @@ local function moveToward(humanoid, root, targetPosition)
 	humanoid:MoveTo(nextPosition)
 end
 
+local function getAlertSound(guard, root)
+	local sound = root:FindFirstChild("AlertSound")
+	if sound and sound:IsA("Sound") then
+		return sound
+	end
+
+	sound = Instance.new("Sound")
+	sound.Name = "AlertSound"
+	sound.SoundId = guard:GetAttribute("AlertSoundId") or ALERT_SOUND_ID
+	sound.Volume = 0.8
+	sound.RollOffMaxDistance = 80
+	sound.Parent = root
+	return sound
+end
+
+local function getAlarmPosition()
+	local position = Workspace:GetAttribute("GuardAlarmPosition")
+	local expires = Workspace:GetAttribute("GuardAlarmExpires")
+	if typeof(position) == "Vector3" and typeof(expires) == "number" and expires > os.clock() then
+		return position
+	end
+	return nil
+end
+
 local function startController(guard)
 	if controllers[guard] or not guard:IsA("Model") or not guard:GetAttribute("PathfindingControlled") then
 		return
@@ -126,6 +151,7 @@ local function startController(guard)
 	end
 	controllers[guard] = true
 	humanoid.WalkSpeed = PATROL_SPEED
+	local alertSound = getAlertSound(guard, root)
 	for _, descendant in guard:GetDescendants() do
 		if descendant:IsA("BasePart") then
 			descendant:SetNetworkOwner(nil)
@@ -138,19 +164,34 @@ local function startController(guard)
 		local lastSeenAt = 0
 		local lastTargetPosition
 		local targetPlayer
+		local alerting = false
 		while guard.Parent == guardFolder and humanoid.Health > 0 do
 			if Workspace:GetAttribute("RoundPhase") ~= "Active" then
+				humanoid.WalkSpeed = PATROL_SPEED
 				humanoid:MoveTo(root.Position)
+				alerting = false
 			else
-				local target = findVisiblePlayer(guard)
-				if target then
-					targetPlayer = target
-					lastSeenAt = os.clock()
-					local targetRoot = target.Character and target.Character:FindFirstChild("HumanoidRootPart")
-					lastTargetPosition = targetRoot and targetRoot.Position or nil
-				elseif os.clock() - lastSeenAt > LOST_SIGHT_GRACE then
+				local alarmPosition = getAlarmPosition()
+				if alarmPosition then
 					targetPlayer = nil
-					lastTargetPosition = nil
+					lastSeenAt = os.clock()
+					lastTargetPosition = alarmPosition
+				else
+					local target = findVisiblePlayer(guard)
+					if target then
+						if not alerting then
+							alertSound:Play()
+							alerting = true
+						end
+						targetPlayer = target
+						lastSeenAt = os.clock()
+						local targetRoot = target.Character and target.Character:FindFirstChild("HumanoidRootPart")
+						lastTargetPosition = targetRoot and targetRoot.Position or nil
+					elseif os.clock() - lastSeenAt > LOST_SIGHT_GRACE then
+						targetPlayer = nil
+						lastTargetPosition = nil
+						alerting = false
+					end
 				end
 
 				if lastTargetPosition then

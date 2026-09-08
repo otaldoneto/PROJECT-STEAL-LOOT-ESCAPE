@@ -24,7 +24,7 @@
     },
 
     "StarterGui": {
-      "ScreenGui": {
+      "HUDController": {
         "$className": "ScreenGui",
         "$properties": {
           "ResetOnSpawn": false
@@ -159,6 +159,31 @@
             "Size": [
               2,
               2,
+              2
+            ]
+          }
+        }
+      },
+      "Vaults": {
+        "$className": "Folder",
+        "Vault": {
+          "$className": "Part",
+          "$properties": {
+            "Anchored": true,
+            "Color": [
+              0.25,
+              0.25,
+              0.28
+            ],
+            "Material": "Metal",
+            "Position": [
+              12,
+              2,
+              16
+            ],
+            "Size": [
+              4,
+              4,
               2
             ]
           }

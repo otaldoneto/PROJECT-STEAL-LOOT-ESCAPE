@@ -12,6 +12,7 @@ local DEFAULT_COINS = 0
 local DEFAULT_BACKPACK_LEVEL = 0
 local MAX_COINS = 1000000000
 local MAX_BACKPACK_LEVEL = 100
+local AUTOSAVE_INTERVAL = 5 * 60
 
 local function getKey(player)
 	return "Player_" .. player.UserId
@@ -164,6 +165,17 @@ for _, player in Players:GetPlayers() do
 	player:SetAttribute("DataStoreReady", false)
 	task.spawn(loadPlayer, player)
 end
+
+task.spawn(function()
+	while true do
+		task.wait(AUTOSAVE_INTERVAL)
+		for _, player in Players:GetPlayers() do
+			if sessions[player] then
+				task.spawn(savePlayer, player)
+			end
+		end
+	end
+end)
 
 game:BindToClose(function()
 	local remaining = 0

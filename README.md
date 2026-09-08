@@ -20,11 +20,11 @@ O arquivo `default.project.json` monta `src/shared` em `ReplicatedStorage/Shared
 
 Os módulos em `src/shared` contêm apenas configurações e regras puras reutilizáveis: `InventoryConfig`, `ProgressionConfig`, `GameConfig` e `RiskConfig`. Eles podem ser lidos pelo cliente para renderização, mas nenhuma decisão de prêmio, compra, velocidade, risco, DataStore ou rodada depende do cliente. A lógica de autoridade permanece modularizada em `src/server`.
 
-O HUD simples de partida fica em `StarterGui.ScreenGui`, sincronizado por `src/client/ScreenGui/MatchStatus.client.lua`. Ele atualiza `MatchTime` usando `ReplicatedStorage.MatchTime` e `BackpackStatus` usando `leaderstats.Mochila`, no formato `Mochila: atual/máximo`. O servidor publica `Mochila` como o número de slots ocupados e `InventorySlotsMax` como o limite.
+O HUD simples de partida fica em `StarterGui.HUDController`, sincronizado por `src/client/ScreenGui/MatchStatus.client.lua`. Ele atualiza `MatchTime` usando `ReplicatedStorage.MatchTime` e `BackpackStatus` usando `leaderstats.Mochila`, no formato `Mochila: atual/máximo`. O servidor publica `Mochila` como o número de slots ocupados e `InventorySlotsMax` como o limite.
 
 O `src/client/ScreenGui/HUDController.client.lua` também atualiza `TimerLabel` com o tempo formatado em `MM:SS` e `LootLabel` no formato `Loot: X/5`, observando `MatchTime.Value` e `leaderstats.Mochila` com `GetPropertyChangedSignal("Value")`.
 
-O `src/server/DataStoreManager.server.lua` carrega e salva `leaderstats.Moedas` e `leaderstats.MochilaNivel` com `DataStoreService`. O carregamento ocorre em `PlayerAdded`; o salvamento ocorre em `PlayerRemoving` e `BindToClose`, com `pcall`, três tentativas e bloqueio contra salvamentos concorrentes. Em falha de carregamento, `DataStoreReady` fica falso e os dados não são sobrescritos.
+O `src/server/DataStoreManager.server.lua` carrega e salva `leaderstats.Moedas` e `leaderstats.MochilaNivel` com `DataStoreService`. O carregamento ocorre em `PlayerAdded`; o salvamento ocorre a cada 5 minutos, em `PlayerRemoving` e em `BindToClose`, com `pcall`, três tentativas e bloqueio contra salvamentos concorrentes. Em falha de carregamento, `DataStoreReady` fica falso e os dados não são sobrescritos.
 
 ## Inventário
 
@@ -38,13 +38,13 @@ O servidor é a autoridade: peso, slots, stacks, distância da coleta, recompens
 
 ## Zona de Escape
 
-Ao entrar em `Active`, o servidor teletransporta o jogador de `Workspace/LobbySpawn` para `Workspace/MapSpawn`. A área `Workspace/EscapeZone` usa `ProximityPrompt` e valida uma região retangular ao redor da peça no servidor. O jogador precisa estar vivo, dentro da área, na fase `Active` e carregando loot com `EscapeValue`. Ao escapar, o servidor registra o roubo, limpa o inventário e leva o jogador ao lobby; a `EscapeZone` não paga moedas. O HUD mostra `EscapeStatus` quando o roubo é recusado ou concluído.
+Ao entrar em `Active`, o servidor teletransporta o jogador de `Workspace.Lobby.SpawnLocation` para `Workspace.Map.SpawnLocation`. A área `Workspace/EscapeZone` usa `ProximityPrompt` e valida uma região retangular ao redor da peça no servidor. O jogador precisa estar vivo, dentro da área, na fase `Active` e carregando loot com `EscapeValue`. Ao escapar, o servidor registra o roubo, limpa o inventário e leva o jogador ao lobby; a `EscapeZone` não paga moedas. O HUD mostra `EscapeStatus` quando o roubo é recusado ou concluído.
 
 Os valores de descarregamento ficam em `src/shared/InventoryConfig.luau`, no campo `EscapeValue` de cada item.
 
 ## Lobby, Venda e Leaderboard
 
-Durante `Intermission`, jogadores ficam no `Workspace/LobbySpawn`. O `Workspace/LootCounter` é o balcão/NPC de venda: use `Sell Loot` para converter a venda pendente em `Money` ou `Points`. A venda é validada no servidor, salva pelo `CurrencyService` e registrada no OrderedDataStore `StealLootEscapeLeaderboard_v1`. O painel `Workspace/LeaderboardBoard` mostra os 10 maiores ladrões por valor vendido e é atualizado periodicamente.
+Durante `Intermission`, jogadores ficam no `Workspace.Lobby.SpawnLocation`. O `Workspace/LootCounter` é o balcão/NPC de venda: use `Sell Loot` para converter a venda pendente em `Money` ou `Points`. A venda é validada no servidor, salva pelo `CurrencyService` e registrada no OrderedDataStore `StealLootEscapeLeaderboard_v1`. O painel `Workspace/LeaderboardBoard` mostra os 10 maiores ladrões por valor vendido e é atualizado periodicamente.
 
 O ciclo é `Intermission` de 20 segundos no lobby, `Active` de 120 segundos no mapa de roubo e `Results` antes da próxima intermission. O `GameManager.server.lua` inicia o ciclo uma única vez depois que os serviços estão prontos. Jogadores que entram durante uma fase são enviados automaticamente ao spawn correto; jogadores no lobby não coletam loot nem são detectados.
 
@@ -58,19 +58,23 @@ Durante a fase `Active`, segure `LeftShift` para correr. A velocidade é aplicad
 
 Cada loot possui `RiskLevel` de `0` a `2` e `RiskDuration` em segundos. `0` é baixo, `1` é médio e `2` é alto. O risco médio aumenta o alcance efetivo de guardas e câmeras em 10%; o risco alto aumenta em 25% e mantém o jogador detectado durante a duração configurada. O servidor valida esses valores antes de registrar o risco. O `GoldBar` de exemplo é de risco alto; `Bandage` é baixo e `Keycard` é médio.
 
-O timer é controlado pelo `RoundService`: a fase `Active` dura 180 segundos e `TimerWarning` fica ativo nos últimos 30 segundos. O HUD exibe a fase, o tempo, o alerta e o risco atual; esses dados são somente leitura no cliente.
+O timer é controlado pelo `RoundService`: a fase `Active` dura 120 segundos e `TimerWarning` fica ativo nos últimos 30 segundos. O HUD exibe a fase, o tempo, o alerta e o risco atual; esses dados são somente leitura no cliente.
 
-O ciclo de partida é controlado apenas pelo servidor: `Intermission` de 10 segundos, `Active` de 3 minutos e `Results` de 8 segundos. No início de uma rodada ativa, o loot do mapa é restaurado e o inventário carregado da rodada anterior é descartado; o jogador precisa coletar novamente e escapar. O cliente apenas exibe `RoundPhase`, `RoundTimeLeft` e os estados replicados, sem poder iniciar, acelerar ou encerrar a rodada.
+O ciclo de partida é controlado apenas pelo servidor: `Intermission` de 20 segundos, `Active` de 120 segundos e `Results` de 8 segundos. No início de uma rodada ativa, o loot do mapa é restaurado e o inventário carregado da rodada anterior é descartado; o jogador precisa coletar novamente e escapar. O cliente apenas exibe `RoundPhase`, `RoundTimeLeft` e os estados replicados, sem poder iniciar, acelerar ou encerrar a rodada.
 
-Quando todo o loot válido da rodada foi coletado e o jogador chega ao escape, o servidor oferece duas opções. `Stay` mantém o jogador no jogo e transforma o loot entregue em carryover com valor dobrado para a próxima entrega. `Return to Lobby` paga a recompensa acumulada e teleporta o jogador para `Workspace/LobbySpawn`; jogadores no lobby não coletam loot nem são detectados. A decisão é validada por RemoteEvent no servidor.
+Quando todo o loot válido da rodada foi coletado e o jogador chega ao escape, o servidor oferece duas opções. `Stay` mantém o jogador no jogo e transforma o loot entregue em carryover com valor dobrado para a próxima entrega. `Return to Lobby` paga a recompensa acumulada e teleporta o jogador para `Workspace.Lobby.SpawnLocation`; jogadores no lobby não coletam loot nem são detectados. A decisão é validada por RemoteEvent no servidor.
 
 Ao ser capturado pela primeira vez, o jogador é restaurado em um ponto seguro e mantém o loot. A segunda captura limpa o inventário da rodada, define `ItemsLost` e exibe um alerta no HUD. Há uma invulnerabilidade curta entre capturas para impedir dano repetido instantâneo.
 
 ## Ameaças
 
+## Lockpick
+
+Os cofres ficam em `Workspace.Vaults` e recebem um `ProximityPrompt` criado pelo servidor. Ao iniciar, o servidor abre a UI de lockpick via `LockpickRemote`; o cliente anima o indicador, mas o servidor calcula o tempo válido usando o relógio sincronizado. Pressionar Espaço dentro da zona verde adiciona uma `GoldBar` ao inventário e desativa o cofre na rodada. Errar toca `AlarmSound`, define a posição do alarme e faz o guarda investigar o cofre por 15 segundos. O `AlarmSoundId` pode ser configurado como atributo do cofre.
+
 O servidor cria uma guarda e uma câmera de demonstração nas pastas `Workspace/Guards` e `Workspace/SecurityCameras` quando elas estão vazias. Guardas usam visão por cone e raycast, patrulham, perseguem jogadores detectados e aplicam dano com cooldown. Câmeras são configuradas por `VisionRange` e `VisionAngle`. O timer global dura 3 minutos e fica disponível em `Workspace.RoundTimeLeft`; ao acabar, jogadores que não escaparam recebem `TimeExpired`.
 
-O NPC de patrulha é controlado por `src/server/GuardController.server.lua`. Ele percorre os `BasePart`s de `Workspace/GuardWaypoints` em ordem de nome usando `PathfindingService`. Quando encontra linha de visão direta via `Raycast` a até 30 studs no cone frontal de 120 graus, interrompe a patrulha, aumenta a velocidade para 18 e persegue a posição atual do jogador com `MoveTo`. Após perder a visão por 5 segundos, retorna à rota; o dano/reset continua centralizado no `ThreatService`. O servidor controla a movimentação e o guarda padrão usa `PathfindingControlled` para impedir dois controladores simultâneos.
+O NPC de patrulha é controlado por `src/server/GuardController.server.lua`. Ele percorre os `BasePart`s de `Workspace/GuardWaypoints` em ordem de nome usando `PathfindingService`. Quando encontra linha de visão direta via `Raycast` a até 35 studs no cone frontal de 120 graus, interrompe a patrulha, toca `AlertSound`, aumenta a velocidade para 18 e persegue a posição atual do jogador com `MoveTo`. Após perder a visão por 5 segundos, retorna à rota; o dano/reset continua centralizado no `ThreatService`. O servidor controla a movimentação e o guarda padrão usa `PathfindingControlled` para impedir dois controladores simultâneos.
 
 Guardas podem ser configuradas como `Model` com `PrimaryPart` ou `HumanoidRootPart`. Seus atributos opcionais são `VisionRange`, `VisionAngle`, `PatrolRadius`, `Speed`, `AttackDistance`, `Damage` e `AttackCooldown`. A detecção é calculada no servidor e exposta ao cliente apenas pelos atributos `Detected` e `ThreatLevel`.
 
