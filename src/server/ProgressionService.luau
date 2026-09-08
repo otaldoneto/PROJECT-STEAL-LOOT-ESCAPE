@@ -59,7 +59,7 @@ function ProgressionService.SetSprinting(player, isSprinting)
 	end
 	local character = player.Character
 	local humanoid = character and character:FindFirstChildOfClass("Humanoid")
-	if not humanoid or humanoid.Health <= 0 or player:GetAttribute("Hidden") or player:GetAttribute("Escaped") then
+	if not humanoid or humanoid.Health <= 0 or player:GetAttribute("Hidden") or player:GetAttribute("Escaped") or player:GetAttribute("Caught") or player:GetAttribute("InLobby") then
 		return false
 	end
 	local sprinting = isSprinting == true and Workspace:GetAttribute("RoundPhase") == "Active"

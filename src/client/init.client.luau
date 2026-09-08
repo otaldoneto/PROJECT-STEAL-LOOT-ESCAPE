@@ -11,6 +11,7 @@ local progressionUpdated = remotes:WaitForChild("ProgressionUpdated")
 local progressionRequest = remotes:WaitForChild("ProgressionRequest")
 local sprintRequest = remotes:WaitForChild("SprintRequest")
 local escapeDecisionRequest = remotes:WaitForChild("EscapeDecisionRequest")
+local roundParticipationRequest = remotes:WaitForChild("RoundParticipationRequest")
 local inventoryConfig = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("InventoryConfig"))
 
 local screenGui = Instance.new("ScreenGui")
@@ -124,6 +125,46 @@ lobbyButton.TextSize = 17
 lobbyButton.Text = "Return to Lobby"
 lobbyButton.Parent = decisionPanel
 
+local participationPanel = Instance.new("Frame")
+participationPanel.Name = "RoundParticipationPanel"
+participationPanel.AnchorPoint = Vector2.new(0.5, 0.5)
+participationPanel.Position = UDim2.fromScale(0.5, 0.5)
+participationPanel.Size = UDim2.fromOffset(380, 170)
+participationPanel.BackgroundColor3 = Color3.fromRGB(25, 25, 32)
+participationPanel.Visible = false
+participationPanel.Parent = screenGui
+
+local participationTitle = Instance.new("TextLabel")
+participationTitle.Name = "Title"
+participationTitle.Size = UDim2.new(1, -24, 0, 60)
+participationTitle.Position = UDim2.fromOffset(12, 12)
+participationTitle.BackgroundTransparency = 1
+participationTitle.TextColor3 = Color3.new(1, 1, 1)
+participationTitle.TextSize = 20
+participationTitle.TextWrapped = true
+participationTitle.Text = "Participar da próxima rodada?"
+participationTitle.Parent = participationPanel
+
+local participationYes = Instance.new("TextButton")
+participationYes.Name = "YesButton"
+participationYes.Size = UDim2.new(0.46, 0, 0, 50)
+participationYes.Position = UDim2.new(0.03, 0, 1, -65)
+participationYes.BackgroundColor3 = Color3.fromRGB(70, 150, 100)
+participationYes.TextColor3 = Color3.new(1, 1, 1)
+participationYes.TextSize = 17
+participationYes.Text = "SIM"
+participationYes.Parent = participationPanel
+
+local participationNo = Instance.new("TextButton")
+participationNo.Name = "NoButton"
+participationNo.Size = UDim2.new(0.46, 0, 0, 50)
+participationNo.Position = UDim2.new(0.51, 0, 1, -65)
+participationNo.BackgroundColor3 = Color3.fromRGB(135, 55, 55)
+participationNo.TextColor3 = Color3.new(1, 1, 1)
+participationNo.TextSize = 17
+participationNo.Text = "NÃO"
+participationNo.Parent = participationPanel
+
 local captureAlert = Instance.new("TextLabel")
 captureAlert.Name = "CaptureAlert"
 captureAlert.AnchorPoint = Vector2.new(0.5, 0)
@@ -231,7 +272,9 @@ local function renderThreatStatus()
 	local phase = workspace:GetAttribute("RoundPhase") or "Loading"
 	local threatLevel = player:GetAttribute("ThreatLevel") or "Safe"
 	local lootRisk = player:GetAttribute("LootRisk") or "Low"
-	if player:GetAttribute("Hidden") then
+	if player:GetAttribute("Caught") then
+		threatLevel = "CAUGHT"
+	elseif player:GetAttribute("Hidden") then
 		threatLevel = "HIDDEN"
 	elseif phase == "Results" then
 		threatLevel = "RESULTS"
@@ -249,6 +292,7 @@ workspace:GetAttributeChangedSignal("RoundTimeLeft"):Connect(renderThreatStatus)
 workspace:GetAttributeChangedSignal("RoundActive"):Connect(renderThreatStatus)
 workspace:GetAttributeChangedSignal("RoundPhase"):Connect(renderThreatStatus)
 workspace:GetAttributeChangedSignal("TimerWarning"):Connect(renderThreatStatus)
+player:GetAttributeChangedSignal("Caught"):Connect(renderThreatStatus)
 player:GetAttributeChangedSignal("ThreatLevel"):Connect(renderThreatStatus)
 player:GetAttributeChangedSignal("Hidden"):Connect(renderThreatStatus)
 player:GetAttributeChangedSignal("LootRisk"):Connect(renderThreatStatus)
@@ -288,6 +332,38 @@ end
 player:GetAttributeChangedSignal("CaptureStatus"):Connect(renderCaptureAlert)
 renderCaptureAlert()
 renderThreatStatus()
+
+local function setParticipationButtonsEnabled(enabled)
+	participationYes.Active = enabled
+	participationYes.AutoButtonColor = enabled
+	participationNo.Active = enabled
+	participationNo.AutoButtonColor = enabled
+end
+
+local function renderParticipation()
+	local inIntermission = workspace:GetAttribute("RoundPhase") == "Intermission"
+	if inIntermission then
+		setParticipationButtonsEnabled(true)
+		participationPanel.Visible = true
+	else
+		participationPanel.Visible = false
+	end
+end
+
+participationYes.Activated:Connect(function()
+	setParticipationButtonsEnabled(false)
+	participationPanel.Visible = false
+	roundParticipationRequest:FireServer("Yes")
+end)
+
+participationNo.Activated:Connect(function()
+	setParticipationButtonsEnabled(false)
+	participationPanel.Visible = false
+	roundParticipationRequest:FireServer("No")
+end)
+
+workspace:GetAttributeChangedSignal("RoundPhase"):Connect(renderParticipation)
+renderParticipation()
 player:GetAttributeChangedSignal("SprintLevel"):Connect(renderProgression)
 player:GetAttributeChangedSignal("SprintSpeed"):Connect(renderProgression)
 player:GetAttributeChangedSignal("SprintUpgradeCost"):Connect(renderProgression)

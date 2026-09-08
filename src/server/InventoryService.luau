@@ -69,7 +69,7 @@ end
 
 function InventoryService.RemoveItem(player, itemId, amount)
 	if typeof(player) ~= "Instance" or not player:IsA("Player") or typeof(itemId) ~= "string" or not isPositiveInteger(amount) then return false, "Invalid item request" end
-	if player:GetAttribute("PersistentDataReady") ~= true or not roundActive or Workspace:GetAttribute("RoundPhase") ~= "Active" then return false, "Round inventory is not editable" end
+	if player:GetAttribute("PersistentDataReady") ~= true or not roundActive or Workspace:GetAttribute("RoundPhase") ~= "Active" or player:GetAttribute("InLobby") or player:GetAttribute("Caught") then return false, "Round inventory is not editable" end
 	local item = InventoryConfig.Items[itemId]
 	local inventory = inventories[player]
 	local currentAmount = inventory and inventory.Items[itemId]

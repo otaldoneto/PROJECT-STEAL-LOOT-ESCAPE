@@ -83,7 +83,7 @@ local function setupPrompt()
 	prompt.Parent = escapeZone
 
 	prompt.Triggered:Connect(function(player)
-		if deliveryInProgress[player] or player.Parent ~= Players or player:GetAttribute("PersistentDataReady") ~= true or not canUseZone(player, escapeZone) then
+		if deliveryInProgress[player] or player.Parent ~= Players or player:GetAttribute("PersistentDataReady") ~= true or player:GetAttribute("InLobby") or player:GetAttribute("Caught") or not canUseZone(player, escapeZone) then
 			player:SetAttribute("EscapeStatus", "Move closer to the escape zone")
 			return
 		end
@@ -179,7 +179,7 @@ function EscapeService.Decide(player, decision)
 		return false
 	end
 	local pendingChoice = pendingChoices[player]
-	if not pendingChoice or player.Parent ~= Players or not canUseZone(player, escapeZone) then
+	if not pendingChoice or player.Parent ~= Players or player:GetAttribute("InLobby") or player:GetAttribute("Caught") or not canUseZone(player, escapeZone) then
 		return false
 	end
 	if decision == "Lobby" and not CurrencyService.CanAdd(player, pendingChoice.RewardType, pendingChoice.Reward + (carryoverRewards[player] or 0)) then

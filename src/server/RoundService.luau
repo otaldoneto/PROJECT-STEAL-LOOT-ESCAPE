@@ -21,6 +21,43 @@ local ROUND_DURATION = GameConfig.Round.ActiveDuration
 local RESULTS_DURATION = GameConfig.Round.ResultsDuration
 local TIMER_WARNING_SECONDS = GameConfig.Round.TimerWarningSeconds
 
+local function hasActiveParticipant()
+	if Workspace:GetAttribute("RoundPhase") ~= "Active" then
+		return false
+	end
+	for _, player in Players:GetPlayers() do
+		if player.Parent == Players
+			and player:GetAttribute("PersistentDataReady") == true
+			and player:GetAttribute("RoundParticipation") == true
+			and not player:GetAttribute("InLobby")
+			and not player:GetAttribute("Caught")
+			and not player:GetAttribute("Escaped") then
+			return true
+		end
+	end
+	return false
+end
+
+local function countParticipants()
+	local total = 0
+	for _, player in Players:GetPlayers() do
+		if player.Parent == Players
+			and player:GetAttribute("PersistentDataReady") == true
+			and player:GetAttribute("RoundParticipation") == true
+			and not player:GetAttribute("Caught")
+			and not player:GetAttribute("Escaped") then
+			total += 1
+		end
+	end
+	return total
+end
+
+local function resetRoundParticipation()
+	for _, player in Players:GetPlayers() do
+		player:SetAttribute("RoundParticipation", false)
+	end
+end
+
 local function setPhase(phase, duration)
 	Workspace:SetAttribute("RoundPhase", phase)
 	Workspace:SetAttribute("RoundTimeLeft", duration)
@@ -59,9 +96,12 @@ end
 local function teleportAll(spawnPart, inLobby)
 	for _, player in Players:GetPlayers() do
 		local eligible = player:GetAttribute("PersistentDataReady") == true
-		if inLobby or eligible then
+		if inLobby then
 			teleportPlayer(player, spawnPart)
-			player:SetAttribute("InLobby", inLobby)
+			player:SetAttribute("InLobby", true)
+		elseif eligible and player:GetAttribute("RoundParticipation") == true then
+			teleportPlayer(player, spawnPart)
+			player:SetAttribute("InLobby", false)
 		else
 			teleportPlayer(player, lobbySpawn)
 			player:SetAttribute("InLobby", true)
@@ -73,7 +113,7 @@ local function setupPlayer(player)
 	player:SetAttribute("InLobby", true)
 	local function syncPlayerParticipation()
 		local ready = player:GetAttribute("PersistentDataReady") == true
-		if Workspace:GetAttribute("RoundPhase") == "Active" and ready then
+		if Workspace:GetAttribute("RoundPhase") == "Active" and ready and player:GetAttribute("RoundParticipation") == true and not player:GetAttribute("Caught") then
 			teleportPlayer(player, mapSpawn)
 			player:SetAttribute("InLobby", false)
 		else
@@ -97,11 +137,30 @@ local function countdown(duration, expectedPhase)
 		if Workspace:GetAttribute("RoundPhase") ~= expectedPhase then
 			return false
 		end
+		if expectedPhase == "Active" and not hasActiveParticipant() then
+			return false
+		end
 		Workspace:SetAttribute("RoundTimeLeft", timeLeft)
 		Workspace:SetAttribute("TimerWarning", expectedPhase == "Active" and timeLeft <= TIMER_WARNING_SECONDS)
 		task.wait(1)
 	end
 	return Workspace:GetAttribute("RoundPhase") == expectedPhase
+end
+
+local function finishActiveRound()
+	if Workspace:GetAttribute("RoundPhase") ~= "Active" then
+		return false
+	end
+	for _, player in Players:GetPlayers() do
+		if not player:GetAttribute("Escaped") and not player:GetAttribute("Caught") then
+			player:SetAttribute("TimeExpired", true)
+		end
+	end
+	HideoutService.ResetRound()
+	ProgressionService.ResetSprint()
+	ThreatService.SetRoundActive(false)
+	setPhase("Results", RESULTS_DURATION)
+	return true
 end
 
 local function runRound()
@@ -110,6 +169,7 @@ local function runRound()
 		setPhase("Intermission", INTERMISSION_DURATION)
 		teleportAll(lobbySpawn, true)
 		resetPlayers()
+		resetRoundParticipation()
 		InventoryService.SetRoundActive(false)
 		ProgressionService.ResetSprint()
 		ThreatService.SetRoundActive(false)
@@ -117,6 +177,10 @@ local function runRound()
 
 		if not running then
 			break
+		end
+
+		if countParticipants() < 1 then
+			continue
 		end
 
 		HideoutService.ResetRound()
@@ -131,17 +195,18 @@ local function runRound()
 		countdown(ROUND_DURATION, "Active")
 
 		if Workspace:GetAttribute("RoundPhase") == "Active" then
-			for _, player in Players:GetPlayers() do
-				if not player:GetAttribute("Escaped") then
-					player:SetAttribute("TimeExpired", true)
-				end
-			end
-			HideoutService.ResetRound()
-			ProgressionService.ResetSprint()
-			ThreatService.SetRoundActive(false)
-			setPhase("Results", RESULTS_DURATION)
+			finishActiveRound()
+		end
+
+		if Workspace:GetAttribute("RoundPhase") == "Results" then
 			countdown(RESULTS_DURATION, "Results")
 		end
+	end
+end
+
+function RoundService.NotifyCapture()
+	if Workspace:GetAttribute("RoundPhase") == "Active" and not hasActiveParticipant() then
+		finishActiveRound()
 	end
 end
 
@@ -155,6 +220,7 @@ function RoundService.Start(inventoryService, lootService, escapeService, threat
 	ProgressionService = progressionService
 	lobbySpawn = lobbyPart
 	mapSpawn = mapPart
+	ThreatService.SetCaptureHandler(RoundService.NotifyCapture)
 	Players.PlayerAdded:Connect(setupPlayer)
 	Players.PlayerRemoving:Connect(function(player)
 		local connections = playerConnections[player]
@@ -164,6 +230,11 @@ function RoundService.Start(inventoryService, lootService, escapeService, threat
 			end
 			playerConnections[player] = nil
 		end
+		task.defer(function()
+			if Workspace:GetAttribute("RoundPhase") == "Active" and not hasActiveParticipant() then
+				finishActiveRound()
+			end
+		end)
 	end)
 	for _, player in Players:GetPlayers() do
 		setupPlayer(player)

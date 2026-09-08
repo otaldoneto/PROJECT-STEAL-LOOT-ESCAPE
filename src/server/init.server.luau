@@ -59,6 +59,10 @@ local lockpickRemote = remotes:FindFirstChild("LockpickRemote") or Instance.new(
 lockpickRemote.Name = "LockpickRemote"
 lockpickRemote.Parent = remotes
 
+local roundParticipationRequest = remotes:FindFirstChild("RoundParticipationRequest") or Instance.new("RemoteEvent")
+roundParticipationRequest.Name = "RoundParticipationRequest"
+roundParticipationRequest.Parent = remotes
+
 local lootFolder = Workspace:FindFirstChild("Loot") or Instance.new("Folder")
 lootFolder.Name = "Loot"
 lootFolder.Parent = Workspace
@@ -203,6 +207,30 @@ inventoryRequest.OnServerEvent:Connect(function(player, action, itemId, amount)
 		InventoryService.RemoveItem(player, itemId, amount)
 	end
 end)
+
+roundParticipationRequest.OnServerEvent:Connect(function(player, decision)
+	if isRateLimited(player) then
+		return
+	end
+	if decision ~= "Yes" and decision ~= "No" then
+		return
+	end
+	if Workspace:GetAttribute("RoundPhase") ~= "Intermission" then
+		return
+	end
+	if player:GetAttribute("PersistentDataReady") ~= true then
+		return
+	end
+	player:SetAttribute("RoundParticipation", decision == "Yes")
+end)
+
+local playersService = game:GetService("Players")
+playersService.PlayerAdded:Connect(function(player)
+	player:SetAttribute("RoundParticipation", false)
+end)
+for _, player in playersService:GetPlayers() do
+	player:SetAttribute("RoundParticipation", false)
+end
 
 game:GetService("Players").PlayerRemoving:Connect(function(player)
 	requestTimestamps[player] = nil

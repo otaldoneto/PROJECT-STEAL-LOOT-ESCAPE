@@ -30,7 +30,7 @@ local function isNear(player, vault)
 end
 
 local function isActiveRound(player)
-	return Workspace:GetAttribute("RoundPhase") == "Active" and not player:GetAttribute("InLobby") and not player:GetAttribute("Hidden")
+	return Workspace:GetAttribute("RoundPhase") == "Active" and not player:GetAttribute("InLobby") and not player:GetAttribute("Caught") and not player:GetAttribute("Hidden")
 end
 
 local function getVaultState(vault)

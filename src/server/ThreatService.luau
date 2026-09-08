@@ -16,6 +16,7 @@ local riskLevels = {}
 local InventoryService
 local safeSpawn
 local captureInvulnerability = {}
+local captureHandler
 
 local function getNumberAttribute(instance, name, default, minimum, maximum)
 	local value = instance:GetAttribute(name)
@@ -168,7 +169,7 @@ local function scanCameras()
 			for _, player in Players:GetPlayers() do
 				local root = getCharacterRoot(player)
 				local riskMultiplier = RiskConfig.GetVisionMultiplier(riskLevels[player] or 0)
-				if root and player:GetAttribute("PersistentDataReady") == true and not player:GetAttribute("Escaped") and not player:GetAttribute("Hidden") and not player:GetAttribute("InLobby") and canSee(camera.Position, camera.CFrame.LookVector, root.Position, range * riskMultiplier, angle, camera, root) then
+				if root and player:GetAttribute("PersistentDataReady") == true and not player:GetAttribute("Escaped") and not player:GetAttribute("Hidden") and not player:GetAttribute("InLobby") and not player:GetAttribute("Caught") and canSee(camera.Position, camera.CFrame.LookVector, root.Position, range * riskMultiplier, angle, camera, root) then
 					setDetection(player, camera)
 				end
 			end
@@ -190,13 +191,16 @@ local function attackPlayer(state, player, distance)
 		local caughtCount = (player:GetAttribute("CaughtCount") or 0) + 1
 		player:SetAttribute("CaughtCount", caughtCount)
 		player:SetAttribute("Caught", true)
+		player:SetAttribute("InLobby", true)
 		captureInvulnerability[player] = now + 5
 		if caughtCount == 1 then
+			InventoryService.ClearItems(player)
+			player:SetAttribute("ItemsLost", true)
 			humanoid.Health = humanoid.MaxHealth
 			if safeSpawn and player.Character then
 				player.Character:PivotTo(safeSpawn.CFrame + Vector3.new(0, 3, 0))
 			end
-			player:SetAttribute("CaptureStatus", "CAUGHT! You have one more chance. Your loot is safe for now.")
+			player:SetAttribute("CaptureStatus", "Captured! Your loot was lost.")
 		else
 			InventoryService.ClearItems(player)
 			player:SetAttribute("ItemsLost", true)
@@ -205,6 +209,9 @@ local function attackPlayer(state, player, distance)
 			if safeSpawn and player.Character then
 				player.Character:PivotTo(safeSpawn.CFrame + Vector3.new(0, 3, 0))
 			end
+		end
+		if captureHandler then
+			captureHandler(player)
 		end
 	end
 end
@@ -220,7 +227,7 @@ local function updateGuard(guard, state, deltaTime)
 	local targetDistance = math.huge
 	for _, player in Players:GetPlayers() do
 		local playerRoot = getCharacterRoot(player)
-		if playerRoot and player:GetAttribute("PersistentDataReady") == true and not player:GetAttribute("Escaped") and not player:GetAttribute("Hidden") and not player:GetAttribute("InLobby") then
+		if playerRoot and player:GetAttribute("PersistentDataReady") == true and not player:GetAttribute("Escaped") and not player:GetAttribute("Hidden") and not player:GetAttribute("InLobby") and not player:GetAttribute("Caught") then
 			local riskMultiplier = RiskConfig.GetVisionMultiplier(riskLevels[player] or 0)
 			local distance = (playerRoot.Position - root.Position).Magnitude
 			if distance < targetDistance and canSee(root.Position, root.CFrame.LookVector, playerRoot.Position, state.VisionRange * riskMultiplier, state.VisionAngle, guard, playerRoot) then
@@ -359,6 +366,10 @@ function ThreatService.Start(guards, cameras, inventoryService, spawnPart)
 		end
 		updateDetectionAttributes()
 	end)
+end
+
+function ThreatService.SetCaptureHandler(handler)
+	captureHandler = typeof(handler) == "function" and handler or nil
 end
 
 function ThreatService.MarkRisk(player, level, duration)

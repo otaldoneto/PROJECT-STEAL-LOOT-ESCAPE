@@ -74,7 +74,7 @@ local function findVisiblePlayer(guard)
 	local closestPlayer
 	local closestDistance = MAX_VISION_DISTANCE
 	for _, player in Players:GetPlayers() do
-		if not player:GetAttribute("Escaped") and not player:GetAttribute("Hidden") and not player:GetAttribute("InLobby") then
+		if not player:GetAttribute("Escaped") and not player:GetAttribute("Hidden") and not player:GetAttribute("InLobby") and not player:GetAttribute("Caught") then
 			local visible, playerRoot = canSeePlayer(guard, player)
 			if visible and playerRoot then
 				local distance = (playerRoot.Position - guard.HumanoidRootPart.Position).Magnitude
