@@ -304,6 +304,7 @@ end
 
 player:GetAttributeChangedSignal("EscapeStatus"):Connect(renderEscapeStatus)
 player:GetAttributeChangedSignal("Escaped"):Connect(renderEscapeStatus)
+player:GetAttributeChangedSignal("EscapeChoicePending"):Connect(renderEscapeStatus)
 renderEscapeStatus()
 
 local function renderLobbyStatus()

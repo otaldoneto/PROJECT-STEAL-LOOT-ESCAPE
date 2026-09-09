@@ -44,19 +44,19 @@ O jogador pode abrir a mochila com `B`. Os objetos de teste ficam na pasta `Work
 
 As regras ficam em `src/shared/InventoryConfig.luau`. Para adicionar loot de inventário ao mapa, crie uma `BasePart` dentro de `Workspace/Loot` com os atributos `ItemId` e `Amount`. O item precisa existir no catálogo e a quantidade não pode ultrapassar `MaxStack`.
 
-Para loot de recompensa, use os atributos `RewardType` (`Money` ou `Points`) e `Reward` (inteiro positivo). Cada objeto pode ser coletado uma vez por jogador em cada rodada, e o servidor restaura os objetos no início da rodada seguinte. O servidor valida distância, personagem vivo, tipo e valor antes de conceder a recompensa. `Money` e `Points` são publicados como atributos do jogador e em `leaderstats`, além de serem salvos no documento canônico `StealLootEscapePlayerData_v2`.
+Para loot de recompensa, use os atributos `RewardType` (`Money` ou `Points`) e `Reward` (inteiro positivo). Cada objeto pode ser coletado uma vez por jogador em cada rodada, e o servidor restaura os objetos no início da rodada seguinte. O servidor valida distância, personagem vivo, tipo e valor antes de conceder a recompensa. Esse valor **não** é creditado diretamente em `Money`/`Points`: ele entra no `RoundInventory` temporário do jogador (`InventoryService.AddValue`), do mesmo jeito que o valor de itens físicos, e só vira moeda persistente depois que o jogador escapa e vende no lobby — assim, o loot de dinheiro fica sujeito ao mesmo risco de perda por captura que qualquer outro item.
 
-O servidor é a autoridade: peso, slots, stacks, distância da coleta, recompensas e remoção são validados no servidor. O inventário da rodada é temporário e não é salvo como inventário persistente.
+O servidor é a autoridade: peso, slots, stacks, distância da coleta, recompensas e remoção são validados no servidor. O inventário da rodada (itens e o valor temporário de `Money`/`Points` coletado) é inteiramente temporário e nunca é salvo como inventário ou moeda persistente.
 
 ## Zona de Escape
 
-Ao entrar em `Active`, o servidor teletransporta o jogador de `Workspace.Lobby.SpawnLocation` para `Workspace.Map.SpawnLocation`. A área `Workspace/EscapeZone` usa `ProximityPrompt` e valida uma região retangular ao redor da peça no servidor. O jogador precisa estar vivo, dentro da área, na fase `Active` e carregando loot com `EscapeValue`. Ao escapar, o servidor registra o roubo, limpa o inventário e leva o jogador ao lobby; a `EscapeZone` não paga moedas. O HUD mostra `EscapeStatus` quando o roubo é recusado ou concluído.
+Ao entrar em `Active`, o servidor teletransporta o jogador de `Workspace.Lobby.SpawnLocation` para `Workspace.Map.SpawnLocation`. A área `Workspace/EscapeZone` usa `ProximityPrompt` e valida uma região retangular ao redor da peça no servidor. O jogador precisa estar vivo, dentro da área, na fase `Active`, não pode estar `Caught`, `Hidden` ou `InLobby`, e precisa carregar valor no `RoundInventory` (itens com `EscapeValue` e/ou o valor temporário de loot de moeda). Ao escapar, o servidor registra o roubo, limpa o inventário e leva o jogador ao lobby; a `EscapeZone` não paga moedas. O HUD mostra `EscapeStatus` quando o roubo é recusado ou concluído.
 
 Os valores de descarregamento ficam em `src/shared/InventoryConfig.luau`, no campo `EscapeValue` de cada item.
 
 ## Lobby, Venda e Leaderboard
 
-Durante `Intermission`, jogadores ficam no `Workspace.Lobby.SpawnLocation`. O `Workspace/LootCounter` é o balcão/NPC de venda: use `Sell Loot` para converter a venda pendente em `Money` ou `Points`. A venda é validada no servidor, salva pelo `CurrencyService` e registrada no OrderedDataStore `StealLootEscapeLeaderboard_v1`. O painel `Workspace/LeaderboardBoard` mostra os 10 maiores ladrões por valor vendido e é atualizado periodicamente.
+Durante `Intermission`, jogadores ficam no `Workspace.Lobby.SpawnLocation`. O `Workspace/LootCounter` é o balcão/NPC de venda: use `Sell Loot` para converter a venda pendente em `Money` ou `Points`. A venda é validada no servidor (exige proximidade do balcão e recusa jogadores `Caught` ou `Hidden`), salva pelo `CurrencyService` e registrada no OrderedDataStore `StealLootEscapeLeaderboard_v1`. Uma venda pendente que não foi resgatada sobrevive ao fim da rodada — o jogador pode voltar ao balcão em uma rodada seguinte e vendê-la normalmente. O painel `Workspace/LeaderboardBoard` mostra os 10 maiores ladrões por valor vendido e é atualizado periodicamente.
 
 O ciclo é `Intermission` de 20 segundos no lobby, `Active` de 120 segundos no mapa de roubo e `Results` antes da próxima intermission. O `GameManager.server.lua` inicia o ciclo uma única vez depois que os serviços estão prontos. Jogadores que entram durante uma fase são enviados automaticamente ao spawn correto; jogadores no lobby não coletam loot nem são detectados.
 
@@ -74,9 +74,9 @@ O timer é controlado pelo `RoundService`: a fase `Active` dura 120 segundos e `
 
 O ciclo de partida é controlado apenas pelo servidor: `Intermission` de 20 segundos, `Active` de 120 segundos e `Results` de 8 segundos. No início de uma rodada ativa, o loot do mapa é restaurado e cada jogador recebe um `RoundInventory` vazio; o jogador precisa coletar novamente e escapar. O `RoundInventory` não é salvo no PlayerData persistente. O cliente apenas exibe `RoundPhase`, `RoundTimeLeft` e os estados replicados, sem poder iniciar, acelerar ou encerrar a rodada.
 
-Quando todo o loot válido da rodada foi coletado e o jogador chega ao escape, o servidor oferece duas opções. `Stay` mantém o jogador no jogo e transforma o loot entregue em carryover com valor dobrado para a próxima entrega. `Return to Lobby` paga a recompensa acumulada e teleporta o jogador para `Workspace.Lobby.SpawnLocation`; jogadores no lobby não coletam loot nem são detectados. A decisão é validada por RemoteEvent no servidor.
+Quando todo o loot válido da rodada foi coletado e o jogador chega ao escape, o servidor oferece duas opções. `Stay` preserva o `RoundInventory` do jogador — ele continua carregando os itens fisicamente — e converte em carryover apenas o valor **ainda não contabilizado**, dobrando o total acumulado; o servidor guarda internamente quanto desse valor já foi convertido, então voltar à `EscapeZone` sem coletar nada novo não gera um novo carryover sobre o mesmo loot, apenas encaminha o valor já acumulado para o lobby. `Return to Lobby` paga a recompensa acumulada (criando uma venda pendente) e teleporta o jogador para `Workspace.Lobby.SpawnLocation`; jogadores no lobby não coletam loot nem são detectados. A decisão é validada por RemoteEvent no servidor e é recusada se o jogador estiver `Caught` ou `Hidden`.
 
-Ao ser capturado pela primeira vez, o jogador é restaurado em um ponto seguro e mantém o loot. A segunda captura limpa o inventário da rodada, define `ItemsLost` e exibe um alerta no HUD. Há uma invulnerabilidade curta entre capturas para impedir dano repetido instantâneo.
+Toda captura restaura o jogador em um ponto seguro, limpa imediatamente o `RoundInventory` e o `CarryoverReward` da rodada, define `ItemsLost` e exibe um alerta (`CaptureStatus`) no HUD — a perda é a mesma da primeira à última captura da rodada, apenas o texto do alerta muda, e `CaughtCount` acompanha quantas vezes o jogador já foi pego. Há uma invulnerabilidade curta entre capturas para impedir dano repetido instantâneo. Se a captura for do último participante ativo, a fase `Active` é encerrada imediatamente, mas o alerta de captura continua visível durante o `Results`; `CaughtCount`, `ItemsLost` e `CaptureStatus` só são zerados no início da rodada seguinte.
 
 ## Ameaças
 
@@ -84,9 +84,9 @@ O `GuardController` possui cleanup protegido para tasks e encerra quando o model
 
 ## Lockpick
 
-Os cofres ficam em `Workspace.Vaults` e recebem um `ProximityPrompt` criado pelo servidor. Ao iniciar, o servidor abre a UI de lockpick via `LockpickRemote`; o cliente anima o indicador, mas o servidor calcula o tempo válido usando o relógio sincronizado. Pressionar Espaço dentro da zona verde adiciona uma `GoldBar` ao inventário e desativa o cofre na rodada. Errar toca `AlarmSound`, define a posição do alarme e faz o guarda investigar o cofre por 15 segundos. O `AlarmSoundId` pode ser configurado como atributo do cofre.
+Os cofres ficam em `Workspace.Vaults` e recebem um `ProximityPrompt` criado pelo servidor. Só é possível iniciar uma sessão durante `Active`, fora do lobby, sem estar `Caught` ou `Hidden` e com `PersistentDataReady` verdadeiro. Ao iniciar, o servidor abre a UI de lockpick via `LockpickRemote`; o cliente anima o indicador, mas o servidor calcula o tempo válido usando o relógio sincronizado — o cliente nunca declara sucesso, apenas envia a tentativa. Pressionar Espaço dentro da zona verde adiciona uma `GoldBar` ao inventário e desativa o cofre na rodada (o estado do cofre é compartilhado, então dois jogadores disputando o mesmo cofre não conseguem receber a recompensa em duplicidade). Errar toca `AlarmSound`, define a posição do alarme (`Workspace.GuardAlarmPosition`/`GuardAlarmExpires`) e faz o guarda investigar o cofre por 15 segundos; esses atributos de alarme são limpos assim que a fase deixa de ser `Active`. Cada sessão possui um timestamp de expiração no servidor — uma varredura encerra sessões esquecidas após 12 segundos mesmo sem tentativa do cliente. Se o jogador for capturado ou a fase da rodada mudar com uma sessão aberta, o servidor fecha a sessão e notifica o cliente (`LockpickRemote` → `"Close"`), garantindo que a UI nunca fique presa na tela; `PlayerRemoving` também limpa a sessão. O `AlarmSoundId` pode ser configurado como atributo do cofre.
 
-O servidor cria uma guarda e uma câmera de demonstração nas pastas `Workspace/Guards` e `Workspace/SecurityCameras` quando elas estão vazias. Guardas usam visão por cone e raycast, patrulham, perseguem jogadores detectados e aplicam dano com cooldown. Câmeras são configuradas por `VisionRange` e `VisionAngle`. O timer global dura 3 minutos e fica disponível em `Workspace.RoundTimeLeft`; ao acabar, jogadores que não escaparam recebem `TimeExpired`.
+O servidor cria uma guarda e uma câmera de demonstração nas pastas `Workspace/Guards` e `Workspace/SecurityCameras` quando elas estão vazias. Guardas usam visão por cone e raycast, patrulham, perseguem jogadores detectados e aplicam dano com cooldown. Câmeras são configuradas por `VisionRange` e `VisionAngle`. O timer da fase `Active` (120 segundos) fica disponível em `Workspace.RoundTimeLeft`; ao acabar, jogadores que não escaparam recebem `TimeExpired`.
 
 O NPC de patrulha é controlado por `src/server/GuardController.server.lua`. Ele percorre os `BasePart`s de `Workspace/GuardWaypoints` em ordem de nome usando `PathfindingService`. Quando encontra linha de visão direta via `Raycast` a até 35 studs no cone frontal de 120 graus, interrompe a patrulha, toca `AlertSound`, aumenta a velocidade para 18 e persegue a posição atual do jogador com `MoveTo`. Após perder a visão por 5 segundos, retorna à rota; o dano/reset continua centralizado no `ThreatService`. O servidor controla a movimentação e o guarda padrão usa `PathfindingControlled` para impedir dois controladores simultâneos.
 
@@ -109,13 +109,19 @@ Workspace.Map.SpawnLocation
 
 Os aliases antigos `Workspace.LobbySpawn` e `Workspace.MapSpawn` foram removidos do projeto Rojo.
 
-## Lockpick
-
-Cada sessão de Lockpick possui timestamp de expiração no servidor. Uma varredura única encerra sessões após 12 segundos mesmo que o cliente não envie tentativa; `PlayerRemoving`, erro, acerto, falha e troca de fase também limpam a sessão.
-
 ## Verificação e Segurança
 
 O projeto não contém chaves ou credenciais: DataStoreService usa somente nomes públicos de stores, e nenhum segredo é armazenado no código. Para validar localmente, execute `rojo build -o "Steal-Loot-Escape.rbxlx"` e confira o diagnóstico do Studio. Testes de DataStore exigem uma experiência publicada e **Enable Studio Access to API Services** habilitado; sem acesso, o salvamento é desativado para evitar sobrescrever dados.
+
+## Integridade Econômica
+
+O fluxo completo de recompensa (`Loot → RoundInventory → Escape → Carryover/Venda pendente → Venda → Money/Points persistente`) foi auditado ponta a ponta para garantir que o servidor seja a única autoridade e que nenhum valor possa ser duplicado, perdido silenciosamente ou criado pelo cliente. Pontos relevantes da arquitetura atual:
+
+- Loot de item e loot de `Money`/`Points` seguem exatamente o mesmo caminho temporário (`RoundInventory`) antes de virar moeda persistente — nenhum dos dois credita `Money`/`Points` diretamente na coleta.
+- Escolher `Stay` repetidamente sem coletar loot novo não gera carryover duplicado: o servidor registra internamente quanto do valor do `RoundInventory` já foi convertido e só considera o valor incremental em cada nova visita à `EscapeZone`.
+- `BindToClose` aguarda salvamentos já em andamento (autosave ou `PlayerRemoving`) antes de considerar um jogador salvo, evitando que o servidor encerre com uma gravação incompleta.
+- O alerta de captura (`CaptureStatus`) permanece visível durante `Results` mesmo quando a própria captura é o motivo do encerramento da rodada.
+- Nenhum `RemoteEvent`/`RemoteFunction` do projeto aceita preço, quantidade, recompensa, nível de upgrade ou resultado de minigame vindo do cliente — o cliente sempre envia apenas a intenção (ex.: `"Attempt"`, `"Stay"`, `"BuySprint"`), e o servidor recalcula e valida tudo.
 
 ## Teste Rápido
 
@@ -123,7 +129,7 @@ O projeto não contém chaves ou credenciais: DataStoreService usa somente nomes
 2. Publique uma experiência de teste e habilite **Game Settings > Security > Enable Studio Access to API Services**.
 3. Aguarde `Active`, colete todo o loot e vá ao `EscapeZone`.
 4. Escolha `Stay` para guardar o carryover em 2x ou `Return to Lobby` para receber a recompensa e ir ao `Workspace.Lobby.SpawnLocation`.
-5. Para testar captura, seja pego uma vez e confirme que o loot permanece; seja pego novamente e confirme o alerta e a perda dos itens.
+5. Para testar captura, colete loot e deixe-se pegar por um guarda; confirme que o loot é perdido imediatamente e que o alerta de captura aparece no HUD.
 6. Saia e entre novamente para confirmar a persistência de `Money`, `Points` e `SprintLevel`.
 
 For more help, check out [the Rojo documentation](https://rojo.space/docs).

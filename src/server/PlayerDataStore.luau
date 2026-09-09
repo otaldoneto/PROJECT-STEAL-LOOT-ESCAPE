@@ -257,15 +257,21 @@ function DataStoreManager.Start()
 		end
 	end)
 	game:BindToClose(function()
+		local deadline = os.clock() + 25
 		local remaining = 0
 		for _, player in Players:GetPlayers() do
 			remaining = remaining + 1
 			task.spawn(function()
-				savePlayer(player)
+				if saveLocks[player] then
+					while saveLocks[player] and os.clock() < deadline do
+						task.wait(0.1)
+					end
+				else
+					savePlayer(player)
+				end
 				remaining = remaining - 1
 			end)
 		end
-		local deadline = os.clock() + 25
 		while remaining > 0 and os.clock() < deadline do task.wait(0.1) end
 	end)
 end

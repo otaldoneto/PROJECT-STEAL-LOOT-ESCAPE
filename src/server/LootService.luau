@@ -84,7 +84,7 @@ local function setupLootPart(lootPart)
 	prompt.Triggered:Connect(function(player)
 		local lootState = activeLoot[lootPart]
 		local playerLoot = getRoundLoot(player)
-		if not lootState or playerLoot.collectedItems[lootPart] or collecting[player] or Workspace:GetAttribute("RoundPhase") ~= "Active" or player.Parent ~= Players or player:GetAttribute("InLobby") or player:GetAttribute("PersistentDataReady") ~= true or not lootPart:IsDescendantOf(lootContainer) or not canCollect(player, lootPart) then
+		if not lootState or playerLoot.collectedItems[lootPart] or collecting[player] or Workspace:GetAttribute("RoundPhase") ~= "Active" or player.Parent ~= Players or player:GetAttribute("InLobby") or player:GetAttribute("Caught") or player:GetAttribute("Hidden") == true or player:GetAttribute("PersistentDataReady") ~= true or not lootPart:IsDescendantOf(lootContainer) or not canCollect(player, lootPart) then
 			return
 		end
 		collecting[player] = true
@@ -93,7 +93,7 @@ local function setupLootPart(lootPart)
 		if isItemLoot then
 			added = InventoryService.AddItem(player, itemId, amount)
 		else
-			added = CurrencyService.Add(player, rewardType, reward)
+			added = InventoryService.AddValue(player, reward)
 		end
 		if added then
 			ThreatService.MarkRisk(player, riskLevel, riskDuration)

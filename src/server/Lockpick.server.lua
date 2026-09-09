@@ -14,6 +14,7 @@ local remote = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("LockpickR
 local vaultFolder = Workspace:WaitForChild("Vaults")
 local sessions = {}
 local vaultStates = {}
+local playerConnections = {}
 
 local SESSION_DURATION = 12
 local TARGET_WIDTH = 0.2
@@ -30,7 +31,7 @@ local function isNear(player, vault)
 end
 
 local function isActiveRound(player)
-	return Workspace:GetAttribute("RoundPhase") == "Active" and not player:GetAttribute("InLobby") and not player:GetAttribute("Caught") and not player:GetAttribute("Hidden")
+	return Workspace:GetAttribute("RoundPhase") == "Active" and not player:GetAttribute("InLobby") and not player:GetAttribute("Caught") and not player:GetAttribute("Hidden") and player:GetAttribute("PersistentDataReady") == true
 end
 
 local function getVaultState(vault)
@@ -165,13 +166,37 @@ remote.OnServerEvent:Connect(function(player, action)
 	closeSession(player, "Success! Gold Bar added to your inventory.")
 end)
 
+local function setupPlayer(player)
+	playerConnections[player] = {
+		player:GetAttributeChangedSignal("Caught"):Connect(function()
+			if player:GetAttribute("Caught") == true and sessions[player] then
+				closeSession(player, "Captured")
+			end
+		end),
+	}
+end
+
+Players.PlayerAdded:Connect(setupPlayer)
+for _, player in Players:GetPlayers() do
+	setupPlayer(player)
+end
+
 Players.PlayerRemoving:Connect(function(player)
 	sessions[player] = nil
+	local connections = playerConnections[player]
+	if connections then
+		for _, connection in connections do
+			connection:Disconnect()
+		end
+		playerConnections[player] = nil
+	end
 end)
 
 Workspace:GetAttributeChangedSignal("RoundPhase"):Connect(function()
 	if Workspace:GetAttribute("RoundPhase") ~= "Active" then
-		sessions = {}
+		for player in pairs(sessions) do
+			closeSession(player, "Round ended")
+		end
 		for vault, state in pairs(vaultStates) do
 			state.Unlocked = false
 			vault.Transparency = 0
@@ -181,5 +206,7 @@ Workspace:GetAttributeChangedSignal("RoundPhase"):Connect(function()
 				prompt.Enabled = true
 			end
 		end
+		Workspace:SetAttribute("GuardAlarmPosition", nil)
+		Workspace:SetAttribute("GuardAlarmExpires", nil)
 	end
 end)

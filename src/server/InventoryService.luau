@@ -16,7 +16,7 @@ end
 local function getInventory(player)
 	local inventory = inventories[player]
 	if inventory then return inventory end
-	inventory = { Items = {}, SlotCount = 0, Weight = 0 }
+	inventory = { Items = {}, SlotCount = 0, Weight = 0, PendingValue = 0 }
 	inventories[player] = inventory
 	return inventory
 end
@@ -67,6 +67,16 @@ function InventoryService.AddItem(player, itemId, amount)
 	return true
 end
 
+function InventoryService.AddValue(player, amount)
+	if typeof(player) ~= "Instance" or not player:IsA("Player") then return false, "Invalid player" end
+	if typeof(amount) ~= "number" or amount < 1 or amount % 1 ~= 0 or amount > 1000000000 then return false, "Invalid value request" end
+	if not inventories[player] or not roundActive or player:GetAttribute("PersistentDataReady") ~= true then return false, "Round inventory is not ready" end
+	local inventory = getInventory(player)
+	inventory.PendingValue = inventory.PendingValue + amount
+	publish(player)
+	return true
+end
+
 function InventoryService.RemoveItem(player, itemId, amount)
 	if typeof(player) ~= "Instance" or not player:IsA("Player") or typeof(itemId) ~= "string" or not isPositiveInteger(amount) then return false, "Invalid item request" end
 	if player:GetAttribute("PersistentDataReady") ~= true or not roundActive or Workspace:GetAttribute("RoundPhase") ~= "Active" or player:GetAttribute("InLobby") or player:GetAttribute("Caught") then return false, "Round inventory is not editable" end
@@ -96,7 +106,7 @@ end
 function InventoryService.GetDepositValue(player)
 	local inventory = inventories[player]
 	if not inventory or not roundActive then return 0 end
-	local totalValue = 0
+	local totalValue = inventory.PendingValue or 0
 	for itemId, amount in pairs(inventory.Items) do
 		local item = InventoryConfig.Items[itemId]
 		if item and typeof(item.EscapeValue) == "number" then totalValue = totalValue + item.EscapeValue * amount end
@@ -110,6 +120,7 @@ function InventoryService.ClearItems(player)
 	table.clear(inventory.Items)
 	inventory.SlotCount = 0
 	inventory.Weight = 0
+	inventory.PendingValue = 0
 	publish(player)
 	return true
 end
@@ -135,7 +146,7 @@ function InventoryService.Start(inventoryUpdatedRemote, snapshotRemote)
 		return InventoryService.GetSnapshot(player)
 	end
 	Players.PlayerAdded:Connect(function(player)
-		inventories[player] = { Items = {}, SlotCount = 0, Weight = 0 }
+		inventories[player] = { Items = {}, SlotCount = 0, Weight = 0, PendingValue = 0 }
 		publish(player)
 	end)
 	Players.PlayerRemoving:Connect(function(player)
@@ -143,7 +154,7 @@ function InventoryService.Start(inventoryUpdatedRemote, snapshotRemote)
 		snapshotTimestamps[player] = nil
 	end)
 	for _, player in Players:GetPlayers() do
-		inventories[player] = { Items = {}, SlotCount = 0, Weight = 0 }
+		inventories[player] = { Items = {}, SlotCount = 0, Weight = 0, PendingValue = 0 }
 		publish(player)
 	end
 end

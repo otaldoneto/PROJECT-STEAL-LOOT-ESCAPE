@@ -320,9 +320,6 @@ function ThreatService.Start(guards, cameras, inventoryService, spawnPart)
 				player:SetAttribute("Detected", false)
 				player:SetAttribute("ThreatLevel", "Safe")
 				player:SetAttribute("LootRisk", "Low")
-				player:SetAttribute("CaughtCount", 0)
-				player:SetAttribute("ItemsLost", false)
-				player:SetAttribute("CaptureStatus", "")
 			end
 			detectionSources = {}
 			riskUntil = {}

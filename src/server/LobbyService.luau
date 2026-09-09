@@ -105,7 +105,7 @@ local function setupSellPrompt()
 	sellPrompt.Parent = sellCounter
 
 	sellPrompt.Triggered:Connect(function(player)
-		if actionLocks[player] or player.Parent ~= Players or player:GetAttribute("Caught") or not canUsePart(player, sellCounter) then
+		if actionLocks[player] or player.Parent ~= Players or player:GetAttribute("Caught") or player:GetAttribute("Hidden") == true or not canUsePart(player, sellCounter) then
 			return
 		end
 		actionLocks[player] = true

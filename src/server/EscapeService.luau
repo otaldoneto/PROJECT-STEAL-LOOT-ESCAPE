@@ -11,6 +11,7 @@ local deliveryInProgress = {}
 local pendingChoices = {}
 local carryoverRewards = {}
 local pendingSales = {}
+local bankedValues = {}
 local playerConnections = {}
 
 local function canUseZone(player, zone)
@@ -52,12 +53,14 @@ local function finishDelivery(player, rewardType, reward, decision)
 		player:SetAttribute("InLobby", false)
 		player:SetAttribute("Escaped", false)
 		carryoverRewards[player] = ((carryoverRewards[player] or 0) + reward) * 2
+		bankedValues[player] = (bankedValues[player] or 0) + reward
 		player:SetAttribute("CarryoverReward", carryoverRewards[player])
 		player:SetAttribute("EscapeStatus", string.format("Loot saved at 2x: %d %s next escape", carryoverRewards[player], rewardType))
 		return true
 	end
 	local totalReward = reward + (carryoverRewards[player] or 0)
 	carryoverRewards[player] = 0
+	bankedValues[player] = nil
 	player:SetAttribute("CarryoverReward", 0)
 	player:SetAttribute("EscapeReward", totalReward)
 	pendingSales[player] = {
@@ -85,13 +88,15 @@ local function setupPrompt()
 	prompt.Parent = escapeZone
 
 	prompt.Triggered:Connect(function(player)
-		if deliveryInProgress[player] or player.Parent ~= Players or player:GetAttribute("PersistentDataReady") ~= true or player:GetAttribute("InLobby") or player:GetAttribute("Caught") or not canUseZone(player, escapeZone) then
+		if deliveryInProgress[player] or player.Parent ~= Players or player:GetAttribute("PersistentDataReady") ~= true or player:GetAttribute("InLobby") or player:GetAttribute("Caught") or player:GetAttribute("Hidden") == true or not canUseZone(player, escapeZone) then
 			player:SetAttribute("EscapeStatus", "Move closer to the escape zone")
 			return
 		end
 		deliveryInProgress[player] = true
 
-		local reward = InventoryService.GetDepositValue(player)
+		local totalValue = InventoryService.GetDepositValue(player)
+		local alreadyBanked = bankedValues[player] or 0
+		local reward = math.max(0, totalValue - alreadyBanked)
 		if Workspace:GetAttribute("RoundPhase") ~= "Active" then
 			player:SetAttribute("EscapeStatus", "Escape is available during Active only")
 			deliveryInProgress[player] = nil
@@ -148,6 +153,7 @@ function EscapeService.Start(inventoryService, currencyService, lootService, zon
 		pendingChoices[player] = nil
 		carryoverRewards[player] = nil
 		pendingSales[player] = nil
+		bankedValues[player] = nil
 		local connections = playerConnections[player]
 		if connections then
 			for _, connection in ipairs(connections) do
@@ -162,6 +168,7 @@ function EscapeService.Start(inventoryService, currencyService, lootService, zon
 			player:GetAttributeChangedSignal("Caught"):Connect(function()
 				if player:GetAttribute("Caught") == true then
 					EscapeService.ClearCarryover(player)
+					bankedValues[player] = nil
 				end
 			end),
 		}
@@ -181,6 +188,7 @@ function EscapeService.ResetRound()
 	deliveryInProgress = {}
 	pendingChoices = {}
 	carryoverRewards = {}
+	bankedValues = {}
 	if escapeZone then
 		local prompt = escapeZone:FindFirstChildOfClass("ProximityPrompt")
 		if prompt then
@@ -201,14 +209,14 @@ function EscapeService.Decide(player, decision)
 		return false
 	end
 	local pendingChoice = pendingChoices[player]
-	if not pendingChoice or player.Parent ~= Players or player:GetAttribute("InLobby") or player:GetAttribute("Caught") or not canUseZone(player, escapeZone) then
+	if not pendingChoice or player.Parent ~= Players or player:GetAttribute("InLobby") or player:GetAttribute("Caught") or player:GetAttribute("Hidden") == true or not canUseZone(player, escapeZone) then
 		return false
 	end
 	if decision == "Lobby" and not CurrencyService.CanAdd(player, pendingChoice.RewardType, pendingChoice.Reward + (carryoverRewards[player] or 0)) then
 		player:SetAttribute("EscapeStatus", "Currency is not ready or full")
 		return false
 	end
-	if not InventoryService.ClearItems(player) then
+	if decision == "Lobby" and not InventoryService.ClearItems(player) then
 		return false
 	end
 	clearChoice(player)
