@@ -39,7 +39,7 @@ local function getVaultState(vault)
 	if state then
 		return state
 	end
-	state = { Unlocked = false }
+	state = { Unlocked = false, Rewarded = {} }
 	vaultStates[vault] = state
 	return state
 end
@@ -152,10 +152,15 @@ remote.OnServerEvent:Connect(function(player, action)
 	end
 
 	local state = getVaultState(vault)
-	if state.Unlocked or not InventoryService.AddItem(player, "GoldBar", 1) then
+	if state.Rewarded[player] then
+		closeSession(player, "Vault already looted")
+		return
+	end
+	if not InventoryService.AddItem(player, "GoldBar", 1) then
 		closeSession(player, "Inventory full")
 		return
 	end
+	state.Rewarded[player] = true
 	state.Unlocked = true
 	vault.Transparency = 1
 	vault.CanCollide = false
@@ -199,6 +204,7 @@ Workspace:GetAttributeChangedSignal("RoundPhase"):Connect(function()
 		end
 		for vault, state in pairs(vaultStates) do
 			state.Unlocked = false
+			table.clear(state.Rewarded)
 			vault.Transparency = 0
 			vault.CanCollide = true
 			local prompt = vault:FindFirstChildOfClass("ProximityPrompt")

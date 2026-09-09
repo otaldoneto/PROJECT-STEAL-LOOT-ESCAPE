@@ -7,6 +7,7 @@ local CurrencyService
 local LootService
 local escapeZone
 local lobbySpawn
+local mapSpawn
 local deliveryInProgress = {}
 local pendingChoices = {}
 local carryoverRewards = {}
@@ -36,6 +37,13 @@ local function moveToLobby(player)
 	player:SetAttribute("InLobby", true)
 end
 
+local function moveToMapSpawn(player)
+	local character = player.Character
+	if character and mapSpawn then
+		character:PivotTo(mapSpawn.CFrame + Vector3.new(0, 3, 0))
+	end
+end
+
 local function clearChoice(player)
 	pendingChoices[player] = nil
 	player:SetAttribute("EscapeChoicePending", false)
@@ -53,9 +61,10 @@ local function finishDelivery(player, rewardType, reward, decision)
 		player:SetAttribute("InLobby", false)
 		player:SetAttribute("Escaped", false)
 		carryoverRewards[player] = ((carryoverRewards[player] or 0) + reward) * 2
-		bankedValues[player] = (bankedValues[player] or 0) + reward
 		player:SetAttribute("CarryoverReward", carryoverRewards[player])
 		player:SetAttribute("EscapeStatus", string.format("Loot saved at 2x: %d %s next escape", carryoverRewards[player], rewardType))
+		bankedValues[player] = (bankedValues[player] or 0) + reward
+		moveToMapSpawn(player)
 		return true
 	end
 	local totalReward = reward + (carryoverRewards[player] or 0)
@@ -103,13 +112,8 @@ local function setupPrompt()
 			return
 		end
 		local carryover = carryoverRewards[player] or 0
-		if reward < 1 and carryover < 1 then
-			player:SetAttribute("EscapeStatus", "Collect loot before escaping")
-			deliveryInProgress[player] = nil
-			return
-		end
-		local _, _, allLootCollected = LootService.GetRoundStatus(player)
-		if allLootCollected and reward > 0 then
+		local totalReward = reward + carryover
+		if reward > 0 then
 			pendingChoices[player] = {
 				Reward = reward,
 				RewardType = rewardType,
@@ -119,7 +123,7 @@ local function setupPrompt()
 			deliveryInProgress[player] = nil
 			return
 		end
-		if not CurrencyService.CanAdd(player, rewardType, reward + carryover) then
+		if totalReward > 0 and not CurrencyService.CanAdd(player, rewardType, totalReward) then
 			player:SetAttribute("EscapeStatus", "Currency is not ready or full")
 			deliveryInProgress[player] = nil
 			return
@@ -146,6 +150,7 @@ function EscapeService.Start(inventoryService, currencyService, lootService, zon
 	LootService = lootService
 	escapeZone = zone
 	lobbySpawn = lobby
+	mapSpawn = Workspace:WaitForChild("Map"):WaitForChild("SpawnLocation")
 	setupPrompt()
 
 	Players.PlayerRemoving:Connect(function(player)
@@ -187,7 +192,6 @@ end
 function EscapeService.ResetRound()
 	deliveryInProgress = {}
 	pendingChoices = {}
-	carryoverRewards = {}
 	bankedValues = {}
 	if escapeZone then
 		local prompt = escapeZone:FindFirstChildOfClass("ProximityPrompt")
@@ -198,7 +202,7 @@ function EscapeService.ResetRound()
 	for _, player in Players:GetPlayers() do
 		player:SetAttribute("EscapeStatus", "Collect loot and reach the escape zone")
 		player:SetAttribute("EscapeChoicePending", false)
-		player:SetAttribute("CarryoverReward", 0)
+		player:SetAttribute("CarryoverReward", carryoverRewards[player] or 0)
 		player:SetAttribute("InLobby", player:GetAttribute("InLobby") == true)
 		player:SetAttribute("LobbyStatus", "Use the lobby counter to sell escaped loot")
 	end

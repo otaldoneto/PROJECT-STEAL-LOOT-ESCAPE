@@ -13,13 +13,34 @@ local guardFolder = Workspace:WaitForChild("Guards")
 local waypointFolder = Workspace:WaitForChild("GuardWaypoints")
 local controllers = {}
 
-local MAX_VISION_DISTANCE = 35
-local FRONT_VISION_ANGLE = 120
 local LOST_SIGHT_GRACE = 5
 local UPDATE_INTERVAL = 0.25
-local PATROL_SPEED = 7
-local CHASE_SPEED = 18
 local ALERT_SOUND_ID = "rbxassetid://9118823101"
+
+local DEFAULT_VISION_RANGE = 45
+local DEFAULT_VISION_ANGLE = 100
+local DEFAULT_SPEED = 7
+local CHASE_SPEED_MULTIPLIER = 18 / 7
+
+local function getNumberAttribute(instance, name, default, minimum, maximum)
+	local value = instance:GetAttribute(name)
+	if typeof(value) ~= "number" or value < minimum or value > maximum then
+		return default
+	end
+	return value
+end
+
+local function getVisionRange(guard)
+	return getNumberAttribute(guard, "VisionRange", DEFAULT_VISION_RANGE, 5, 200)
+end
+
+local function getVisionAngle(guard)
+	return getNumberAttribute(guard, "VisionAngle", DEFAULT_VISION_ANGLE, 10, 180)
+end
+
+local function getPatrolSpeed(guard)
+	return getNumberAttribute(guard, "Speed", DEFAULT_SPEED, 0, 50)
+end
 
 local function getRootAndHumanoid(guard)
 	local root = guard:FindFirstChild("HumanoidRootPart")
@@ -52,12 +73,15 @@ local function canSeePlayer(guard, player)
 		return false, nil
 	end
 
+	local visionRange = getVisionRange(guard)
+	local visionAngle = getVisionAngle(guard)
+
 	local offset = playerRoot.Position - guardRoot.Position
-	if offset.Magnitude > MAX_VISION_DISTANCE then
+	if offset.Magnitude > visionRange then
 		return false, playerRoot
 	end
 	local direction = offset.Unit
-	if guardRoot.CFrame.LookVector:Dot(direction) < math.cos(math.rad(FRONT_VISION_ANGLE / 2)) then
+	if guardRoot.CFrame.LookVector:Dot(direction) < math.cos(math.rad(visionAngle / 2)) then
 		return false, playerRoot
 	end
 
@@ -72,9 +96,9 @@ end
 
 local function findVisiblePlayer(guard)
 	local closestPlayer
-	local closestDistance = MAX_VISION_DISTANCE
+	local closestDistance = getVisionRange(guard)
 	for _, player in Players:GetPlayers() do
-		if not player:GetAttribute("Escaped") and not player:GetAttribute("Hidden") and not player:GetAttribute("InLobby") and not player:GetAttribute("Caught") then
+		if player:GetAttribute("PersistentDataReady") == true and not player:GetAttribute("Escaped") and not player:GetAttribute("Hidden") and not player:GetAttribute("InLobby") and not player:GetAttribute("Caught") then
 			local visible, playerRoot = canSeePlayer(guard, player)
 			if visible and playerRoot then
 				local distance = (playerRoot.Position - guard.HumanoidRootPart.Position).Magnitude
@@ -86,6 +110,15 @@ local function findVisiblePlayer(guard)
 		end
 	end
 	return closestPlayer
+end
+
+local function isTargetEligible(player)
+	return player.Parent == Players
+		and player:GetAttribute("PersistentDataReady") == true
+		and not player:GetAttribute("Escaped")
+		and not player:GetAttribute("Hidden")
+		and not player:GetAttribute("InLobby")
+		and not player:GetAttribute("Caught")
 end
 
 local function getNextPathPosition(startPosition, targetPosition)
@@ -150,7 +183,7 @@ local function startController(guard)
 		return
 	end
 	controllers[guard] = true
-	humanoid.WalkSpeed = PATROL_SPEED
+	humanoid.WalkSpeed = getPatrolSpeed(guard)
 	local alertSound = getAlertSound(guard, root)
 	for _, descendant in guard:GetDescendants() do
 		if descendant:IsA("BasePart") then
@@ -168,9 +201,12 @@ local function startController(guard)
 		local alerting = false
 		while guard.Parent == guardFolder and root.Parent == guard and humanoid.Parent == guard and humanoid.Health > 0 do
 			if Workspace:GetAttribute("RoundPhase") ~= "Active" then
-				humanoid.WalkSpeed = PATROL_SPEED
+				humanoid.WalkSpeed = getPatrolSpeed(guard)
 				humanoid:MoveTo(root.Position)
 				alerting = false
+				targetPlayer = nil
+				lastTargetPosition = nil
+				lastSeenAt = 0
 			else
 				local alarmPosition = getAlarmPosition()
 				if alarmPosition then
@@ -188,6 +224,11 @@ local function startController(guard)
 						lastSeenAt = os.clock()
 						local targetRoot = target.Character and target.Character:FindFirstChild("HumanoidRootPart")
 						lastTargetPosition = targetRoot and targetRoot.Position or nil
+					elseif targetPlayer and not isTargetEligible(targetPlayer) then
+						targetPlayer = nil
+						lastTargetPosition = nil
+						lastSeenAt = 0
+						alerting = false
 					elseif os.clock() - lastSeenAt > LOST_SIGHT_GRACE then
 						targetPlayer = nil
 						lastTargetPosition = nil
@@ -196,14 +237,14 @@ local function startController(guard)
 				end
 
 				if lastTargetPosition then
-					humanoid.WalkSpeed = CHASE_SPEED
+					humanoid.WalkSpeed = getPatrolSpeed(guard) * CHASE_SPEED_MULTIPLIER
 					local targetRoot = targetPlayer and targetPlayer.Character and targetPlayer.Character:FindFirstChild("HumanoidRootPart")
 					if targetRoot and targetRoot.Parent then
 						lastTargetPosition = targetRoot.Position
 					end
 					humanoid:MoveTo(lastTargetPosition)
 				elseif #waypoints > 0 then
-					humanoid.WalkSpeed = PATROL_SPEED
+					humanoid.WalkSpeed = getPatrolSpeed(guard)
 					local waypoint = waypoints[waypointIndex]
 					if (root.Position - waypoint.Position).Magnitude <= 4 then
 						waypointIndex = waypointIndex % #waypoints + 1
@@ -211,7 +252,7 @@ local function startController(guard)
 					end
 					moveToward(humanoid, root, waypoint.Position)
 				else
-					humanoid.WalkSpeed = PATROL_SPEED
+					humanoid.WalkSpeed = getPatrolSpeed(guard)
 					humanoid:MoveTo(root.Position)
 				end
 			end

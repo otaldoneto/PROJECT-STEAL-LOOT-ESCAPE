@@ -364,6 +364,7 @@ participationNo.Activated:Connect(function()
 end)
 
 workspace:GetAttributeChangedSignal("RoundPhase"):Connect(renderParticipation)
+workspace:GetAttributeChangedSignal("RoundNumber"):Connect(renderParticipation)
 renderParticipation()
 player:GetAttributeChangedSignal("SprintLevel"):Connect(renderProgression)
 player:GetAttributeChangedSignal("SprintSpeed"):Connect(renderProgression)
