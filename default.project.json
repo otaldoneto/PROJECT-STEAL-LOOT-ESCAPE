@@ -23,16 +23,6 @@
       }
     },
 
-    "StarterGui": {
-      "HUDController": {
-        "$className": "ScreenGui",
-        "$properties": {
-          "ResetOnSpawn": false
-        },
-        "$path": "src/client/ScreenGui"
-      }
-    },
-
     "Workspace": {
       "$properties": {
         "FilteringEnabled": true

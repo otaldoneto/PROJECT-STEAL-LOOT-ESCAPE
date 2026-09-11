@@ -222,9 +222,11 @@ buySprint.Parent = shopPanel
 
 local function updateInventoryTitle()
 	local weight = player:GetAttribute("InventoryWeight") or 0
+	local maxWeight = player:GetAttribute("InventoryWeightMax") or inventoryConfig.MaxWeight
 	local slots = player:GetAttribute("InventorySlots") or 0
+	local maxSlots = player:GetAttribute("InventorySlotsMax") or inventoryConfig.MaxSlots
 	local money = player:GetAttribute("Money") or 0
-	title.Text = string.format("Backpack  $%d  %.1f / %.1f kg  (%d / %d)", money, weight, inventoryConfig.MaxWeight, slots, inventoryConfig.MaxSlots)
+	title.Text = string.format("Backpack  $%d  %.1f / %.1f kg  (%d / %d)", money, weight, maxWeight, slots, maxSlots)
 end
 
 local function render(snapshot)
@@ -402,5 +404,7 @@ end)
 player:GetAttributeChangedSignal("InventoryWeight"):Connect(function()
 	updateInventoryTitle()
 end)
+player:GetAttributeChangedSignal("InventoryWeightMax"):Connect(updateInventoryTitle)
 player:GetAttributeChangedSignal("InventorySlots"):Connect(updateInventoryTitle)
+player:GetAttributeChangedSignal("InventorySlotsMax"):Connect(updateInventoryTitle)
 player:GetAttributeChangedSignal("Money"):Connect(updateInventoryTitle)

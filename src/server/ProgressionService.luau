@@ -59,7 +59,7 @@ function ProgressionService.SetSprinting(player, isSprinting)
 	end
 	local character = player.Character
 	local humanoid = character and character:FindFirstChildOfClass("Humanoid")
-	if not humanoid or humanoid.Health <= 0 or player:GetAttribute("Hidden") or player:GetAttribute("Escaped") or player:GetAttribute("Caught") or player:GetAttribute("InLobby") then
+	if not humanoid or humanoid.Health <= 0 or player:GetAttribute("Hidden") or player:GetAttribute("Escaped") or player:GetAttribute("Caught") == true or player:GetAttribute("InLobby") then
 		return false
 	end
 	local sprinting = isSprinting == true and Workspace:GetAttribute("RoundPhase") == "Active"
@@ -69,12 +69,21 @@ function ProgressionService.SetSprinting(player, isSprinting)
 	return true
 end
 
+function ProgressionService.ResetSprintForPlayer(player)
+	if typeof(player) ~= "Instance" or not player:IsA("Player") then
+		return
+	end
+	local character = player.Character
+	local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+	if humanoid then
+		humanoid.WalkSpeed = ProgressionConfig.BaseWalkSpeed
+	end
+	player:SetAttribute("Sprinting", false)
+end
+
 function ProgressionService.ResetSprint()
 	for _, player in Players:GetPlayers() do
-		local character = player.Character
-		local humanoid = character and character:FindFirstChildOfClass("Humanoid")
-		if humanoid then humanoid.WalkSpeed = ProgressionConfig.BaseWalkSpeed end
-		player:SetAttribute("Sprinting", false)
+		ProgressionService.ResetSprintForPlayer(player)
 	end
 end
 

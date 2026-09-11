@@ -14,6 +14,7 @@ local roundActive = false
 local riskUntil = {}
 local riskLevels = {}
 local InventoryService
+local ProgressionService
 local safeSpawn
 local captureInvulnerability = {}
 local captureHandler
@@ -193,9 +194,15 @@ local function attackPlayer(state, player, distance)
 		player:SetAttribute("Caught", true)
 		player:SetAttribute("InLobby", true)
 		player:SetAttribute("EscapeChoicePending", false)
+		if ProgressionService then
+			ProgressionService.ResetSprintForPlayer(player)
+		end
 		captureInvulnerability[player] = now + 5
 		if caughtCount == 1 then
-			InventoryService.ClearItems(player)
+			-- CurrentRound only: PendingSale (already-escaped, unsold loot
+			-- from an earlier trigger, possibly a prior round) is a
+			-- physically separate group InventoryService never touches here.
+			InventoryService.ClearCurrentRound(player)
 			player:SetAttribute("ItemsLost", true)
 			humanoid.Health = humanoid.MaxHealth
 			if safeSpawn and player.Character then
@@ -203,7 +210,10 @@ local function attackPlayer(state, player, distance)
 			end
 			player:SetAttribute("CaptureStatus", "Captured! Your loot was lost.")
 		else
-			InventoryService.ClearItems(player)
+			-- CurrentRound only: PendingSale (already-escaped, unsold loot
+			-- from an earlier trigger, possibly a prior round) is a
+			-- physically separate group InventoryService never touches here.
+			InventoryService.ClearCurrentRound(player)
 			player:SetAttribute("ItemsLost", true)
 			player:SetAttribute("CaptureStatus", "CAUGHT AGAIN! All loot from this round was lost.")
 			humanoid.Health = humanoid.MaxHealth
@@ -280,12 +290,13 @@ local function initializePlayer(player)
 	player:SetAttribute("CaptureStatus", "")
 end
 
-function ThreatService.Start(guards, cameras, inventoryService, spawnPart)
+function ThreatService.Start(guards, cameras, inventoryService, spawnPart, progressionService)
 	assert(guards and guards:IsA("Folder"), "Guards must be a Folder")
 	assert(cameras and cameras:IsA("Folder"), "SecurityCameras must be a Folder")
 	guardFolder = guards
 	cameraFolder = cameras
 	InventoryService = inventoryService
+	ProgressionService = progressionService
 	safeSpawn = spawnPart
 
 	if #guardFolder:GetChildren() == 0 then

@@ -105,22 +105,37 @@ local function setupSellPrompt()
 	sellPrompt.Parent = sellCounter
 
 	sellPrompt.Triggered:Connect(function(player)
-		if actionLocks[player] or player.Parent ~= Players or player:GetAttribute("Caught") or player:GetAttribute("Hidden") == true or not canUsePart(player, sellCounter) then
+		if actionLocks[player] or player.Parent ~= Players or player:GetAttribute("Caught") or player:GetAttribute("Hidden") == true then
+			return
+		end
+		if not canUsePart(player, sellCounter) then
+			-- canUsePart's box can reject a position still within the
+			-- ProximityPrompt's own MaxActivationDistance, so the prompt can
+			-- fire with nothing visibly happening; give the same feedback
+			-- EscapeService already gives for its own position check.
+			player:SetAttribute("LobbyStatus", "Move closer to the loot counter")
+			return
+		end
+		-- Cheap local pre-check so an obviously-empty pending sale doesn't
+		-- cost a DataStore round-trip; the actual sale below is what
+		-- authoritatively decides how much (if anything) gets sold.
+		local quickAmount = EscapeService.GetPendingSale(player)
+		if quickAmount < 1 then
+			player:SetAttribute("LobbyStatus", "No loot to sell or currency is full")
 			return
 		end
 		actionLocks[player] = true
-		local amount, rewardType = EscapeService.GetPendingSale(player)
-		if amount < 1 or not CurrencyService.CanAdd(player, rewardType, amount) then
-			player:SetAttribute("LobbyStatus", "No loot to sell or currency is full")
-			actionLocks[player] = nil
-			return
-		end
-		if not CurrencyService.Add(player, rewardType, amount) then
+		local success, amount, rewardType = EscapeService.SellPendingReward(player)
+		if not success then
 			player:SetAttribute("LobbyStatus", "Sale failed")
 			actionLocks[player] = nil
 			return
 		end
-		EscapeService.ClearPendingSale(player)
+		if amount < 1 then
+			player:SetAttribute("LobbyStatus", "No loot to sell or currency is full")
+			actionLocks[player] = nil
+			return
+		end
 		player:SetAttribute("LobbyStatus", string.format("Sold loot: +%d %s", amount, rewardType))
 		if not recordSale(player, amount) then
 			warn(string.format("Could not update leaderboard for %s", player.Name))

@@ -9,6 +9,7 @@ local LootService = {}
 local InventoryService
 local CurrencyService
 local ThreatService
+local EscapeService
 local lootContainer
 local activeLoot = {}
 local lootStates = {}
@@ -101,7 +102,13 @@ local function setupLootPart(lootPart)
 			playerLoot.totalValue = playerLoot.totalValue + (isItemLoot and item.EscapeValue * amount or reward)
 			playerLoot.weight = playerLoot.weight + (isItemLoot and item.Weight * amount or 0)
 			player:SetAttribute("Escaped", false)
-			player:SetAttribute("EscapeReward", 0)
+			-- EscapeReward reflects PendingSaleAmount, which can legitimately
+			-- still be nonzero here (an unsold sale from a previous round);
+			-- re-sync it from the real persisted value instead of forcing it
+			-- to 0.
+			if EscapeService then
+				EscapeService.SyncEscapeReward(player)
+			end
 			player:SetAttribute("EscapeStatus", "Loot collected. Reach the escape zone")
 			collecting[player] = nil
 		else
@@ -110,10 +117,11 @@ local function setupLootPart(lootPart)
 	end)
 end
 
-function LootService.Start(inventoryService, currencyService, threatService, lootFolder)
+function LootService.Start(inventoryService, currencyService, threatService, lootFolder, escapeService)
 	InventoryService = inventoryService
 	CurrencyService = currencyService
 	ThreatService = threatService
+	EscapeService = escapeService
 	lootContainer = lootFolder
 	for _, descendant in lootFolder:GetDescendants() do
 		setupLootPart(descendant)

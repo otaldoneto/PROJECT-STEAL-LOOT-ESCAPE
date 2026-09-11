@@ -69,7 +69,10 @@ end
 local function resetPlayers()
 	for _, player in Players:GetPlayers() do
 		player:SetAttribute("Escaped", false)
-		player:SetAttribute("EscapeReward", 0)
+		-- EscapeReward reflects PendingSaleAmount, which can legitimately
+		-- still be nonzero across a round reset; re-sync it from the real
+		-- persisted value instead of forcing it to 0 here.
+		EscapeService.SyncEscapeReward(player)
 		player:SetAttribute("Detected", false)
 		player:SetAttribute("ThreatLevel", "Safe")
 		player:SetAttribute("TimeExpired", false)
@@ -159,6 +162,10 @@ local function finishActiveRound()
 	HideoutService.ResetRound()
 	ProgressionService.ResetSprint()
 	ThreatService.SetRoundActive(false)
+	-- Forfeit any unfinalized Stay bonus/pending choice in the same
+	-- synchronous step as TimeExpired, before Results becomes visible to any
+	-- client - so no late Escape decision can ever land after this.
+	EscapeService.EndRound()
 	setPhase("Results", RESULTS_DURATION)
 	return true
 end

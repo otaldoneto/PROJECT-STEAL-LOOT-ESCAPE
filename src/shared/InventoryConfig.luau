@@ -1,6 +1,11 @@
 local InventoryConfig = {
 	MaxSlots = 20,
 	MaxWeight = 50,
+	-- Max carry weight (kg) by BackpackLevel, indexed 1-5 like ProgressionConfig's
+	-- SprintSpeeds/SprintCosts. BackpackLevel 0 (the default - there is no purchase
+	-- flow for it yet) falls back to index 1, same pattern as
+	-- ProgressionConfig.getSprintSpeed falling back to BaseWalkSpeed for level 0.
+	BackpackCapacities = { 20, 30, 40, 50, 60 },
 	Items = {
 		Bandage = {
 			DisplayName = "Bandage",

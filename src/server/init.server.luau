@@ -163,13 +163,13 @@ local vaults = Workspace:FindFirstChild("Vaults") or Instance.new("Folder")
 vaults.Name = "Vaults"
 vaults.Parent = Workspace
 
-InventoryService.Start(inventoryUpdated, inventorySnapshot)
+InventoryService.Start(inventoryUpdated, inventorySnapshot, DataStoreManager)
 DataStoreManager.Start()
 CurrencyService.Start(DataStoreManager)
 ProgressionService.Start(progressionUpdated, DataStoreManager)
-LootService.Start(InventoryService, CurrencyService, ThreatService, lootFolder)
-EscapeService.Start(InventoryService, CurrencyService, LootService, escapeZone, lobbySpawn)
-ThreatService.Start(guards, securityCameras, InventoryService, lobbySpawn)
+LootService.Start(InventoryService, CurrencyService, ThreatService, lootFolder, EscapeService)
+EscapeService.Start(InventoryService, CurrencyService, LootService, escapeZone, lobbySpawn, ProgressionService, DataStoreManager)
+ThreatService.Start(guards, securityCameras, InventoryService, lobbySpawn, ProgressionService)
 HideoutService.Start(hideouts)
 LobbyService.Start(EscapeService, CurrencyService, lootCounter, leaderboardBoard)
 Workspace:SetAttribute("ServicesReady", true)

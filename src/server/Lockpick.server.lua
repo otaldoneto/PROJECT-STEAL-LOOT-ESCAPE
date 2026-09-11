@@ -11,9 +11,9 @@ end
 
 local InventoryService = require(script.Parent:WaitForChild("InventoryService"))
 local remote = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("LockpickRemote")
-local vaultFolder = Workspace:WaitForChild("Vaults")
 local sessions = {}
 local vaultStates = {}
+local vaultFolders = {}
 local playerConnections = {}
 
 local SESSION_DURATION = 12
@@ -85,7 +85,12 @@ end
 
 local function startSession(player, vault)
 	local state = getVaultState(vault)
-	if sessions[player] or state.Unlocked or not isActiveRound(player) or not isNear(player, vault) then
+	-- Eligibility is per-player: Rewarded[player] is the only thing that
+	-- blocks a session here. Unlocked is informational/visual only (set on
+	-- any success, for the vault's appearance) and must never gate who can
+	-- attempt the vault, so a second player can still loot it after a first
+	-- player already succeeded.
+	if sessions[player] or state.Rewarded[player] or not isActiveRound(player) or not isNear(player, vault) then
 		return
 	end
 
@@ -129,10 +134,34 @@ local function setupVault(vault)
 	end)
 end
 
-for _, vault in vaultFolder:GetChildren() do
-	setupVault(vault)
+-- Workspace currently has two separate "Vaults" folders (one Rojo-tracked,
+-- one Studio-only leftover), each with its own Vault Part.
+-- Workspace:WaitForChild("Vaults") only ever resolves one of them, so every
+-- "Vaults"-named Folder in Workspace is set up here instead of relying on a
+-- single resolved reference - this is what previously left the second
+-- Vault without a ProximityPrompt/AlarmSound.
+local function setupVaultFolder(folder)
+	if vaultFolders[folder] then
+		return
+	end
+	vaultFolders[folder] = true
+	for _, vault in folder:GetChildren() do
+		setupVault(vault)
+	end
+	folder.ChildAdded:Connect(setupVault)
 end
-vaultFolder.ChildAdded:Connect(setupVault)
+
+Workspace:WaitForChild("Vaults")
+for _, child in Workspace:GetChildren() do
+	if child.Name == "Vaults" and child:IsA("Folder") then
+		setupVaultFolder(child)
+	end
+end
+Workspace.ChildAdded:Connect(function(child)
+	if child.Name == "Vaults" and child:IsA("Folder") then
+		setupVaultFolder(child)
+	end
+end)
 
 remote.OnServerEvent:Connect(function(player, action)
 	local session = sessions[player]
@@ -140,7 +169,7 @@ remote.OnServerEvent:Connect(function(player, action)
 		return
 	end
 	local vault = session.Vault
-	if not vault:IsDescendantOf(vaultFolder) or not isNear(player, vault) or not isActiveRound(player) then
+	if not vault:IsDescendantOf(Workspace) or not isNear(player, vault) or not isActiveRound(player) then
 		closeSession(player, "Lockpick cancelled")
 		return
 	end
@@ -161,13 +190,14 @@ remote.OnServerEvent:Connect(function(player, action)
 		return
 	end
 	state.Rewarded[player] = true
+	-- Unlocked is now purely a visual/informational marker (this vault has
+	-- been opened by someone this round) - it must stay enabled so other,
+	-- still-eligible players can keep attempting it. Do not disable the
+	-- prompt here: Rewarded[player] is what gates eligibility now, not the
+	-- prompt itself.
 	state.Unlocked = true
 	vault.Transparency = 1
 	vault.CanCollide = false
-	local prompt = vault:FindFirstChildOfClass("ProximityPrompt")
-	if prompt then
-		prompt.Enabled = false
-	end
 	closeSession(player, "Success! Gold Bar added to your inventory.")
 end)
 
